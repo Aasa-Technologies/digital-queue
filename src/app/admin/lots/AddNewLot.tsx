@@ -1,86 +1,102 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"; // Adjust these imports based on your actual path
 import { Input } from "@/components/ui/input";
-import axios from "axios";
 import { toast } from "sonner";
-import { getUserData } from "@/utils";
+import { addDoc, collection } from "firebase/firestore";
+import { db } from "@/utils/firebase"; // Adjust the path as necessary
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import moment from "moment";
 
-const AddNewLots = () => {
-  const userId = getUserData();
-  const [formData, setFormData] = useState({
-    name: "",
-    user: userId, // Default user ID, update as needed
+// Validation schema
+const lotSchema = z.object({
+  name: z.string().min(1, { message: "Lot name is required" }),
+});
+
+type LotFormValues = z.infer<typeof lotSchema>;
+
+const AddNewLots = ({ user, onLotAdded }: any) => {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const form = useForm<LotFormValues>({
+    resolver: zodResolver(lotSchema),
+    defaultValues: {
+      name: "",
+    },
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (data: LotFormValues) => {
     try {
-      const res = await axios.post("/api/admin/lots", formData);
-      if (res) {
-        toast.success(res.data.message);
-        // Clear form data after successful submission
-        setFormData({
-          name: "",
-          user: userId, // Reset user ID
-        });
-      }
+      await addDoc(collection(db, "lots"), {
+        name: data.name,
+        adminId: user?.id,
+        status: "active",
+        createdAt: moment().format(),
+        updatedAt: moment().format(),
+      });
+      toast.success("Lot added successfully!");
+
+      // Reset the form fields after submission
+      onLotAdded();
+      form.reset();
+      setDialogOpen(false); // Close the dialog
     } catch (error: any) {
-      if (error.response) {
-        toast.error(error.response.data.error);
-      } else {
-        toast.error("An error occurred. Please try again later.");
-      }
+      console.error("Error adding lot: ", error);
+      toast.error("An error occurred while adding the lot. Please try again.");
     }
   };
 
   return (
     <>
-      <Dialog>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
-          <Button>Add New Lot</Button>
+          <Button onClick={() => setDialogOpen(true)}>Add New Lot</Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Lots</DialogTitle>
           </DialogHeader>
-          <Label htmlFor="name">Name</Label>
-          <Input
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-          {/* <Label htmlFor="user">User</Label>
-          <Input
-            id="user"
-            name="user"
-            value={formData.user}
-            onChange={handleChange}
-            required
-          /> */}
-          <div>
-            <Button onClick={handleSubmit}>Add Lot</Button>
-          </div>
+
+          <Form {...form}>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="name">Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      id="name"
+                      placeholder="Enter lot name"
+                      {...field} // Spread the field properties here
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="mt-4">
+              <Button onClick={form.handleSubmit(handleSubmit)}>Add Lot</Button>
+            </div>
+          </Form>
         </DialogContent>
       </Dialog>
     </>

@@ -1,113 +1,261 @@
 "use client";
-import React, { useState } from "react";
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
-} from "@nextui-org/react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import axios from "axios";
-import { handleResponse } from "@/utils";
-import { toast } from "sonner";
 
-export default function AddNewAdmin() {
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    password: "",
-    role: "Admin",
+import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { db } from "@/utils/firebase";
+import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
+import moment from "moment";
+
+const adminFormSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  phoneNumber: z
+    .string()
+    .regex(/^\+?[1-9]\d{1,14}$/, { message: "Invalid phone number" }),
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  sessionCost: z
+    .number()
+    .positive({ message: "Session cost must be positive" }),
+  lotLimit: z
+    .number()
+    .int()
+    .positive({ message: "Lot limit must be a positive integer" }),
+  queueLimit: z
+    .number()
+    .int()
+    .positive({ message: "Queue limit must be a positive integer" }),
+  password: z
+    .string()
+    .min(8, { message: "Password must be at least 8 characters" })
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{8,}$/,
+      {
+        message:
+          "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.",
+      }
+    ),
+});
+
+type AdminFormValues = z.infer<typeof adminFormSchema>;
+
+export default function AddNewAdmin({
+  onAdminAdded,
+}: {
+  onAdminAdded: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const form = useForm<AdminFormValues>({
+    resolver: zodResolver(adminFormSchema),
+    defaultValues: {
+      email: "",
+      phoneNumber: "",
+      name: "",
+      sessionCost: 0,
+      lotLimit: 0,
+      queueLimit: 0,
+      password: "", // Initialize password field
+    },
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  async function onSubmit(data: AdminFormValues) {
     try {
-      const res = await axios.post("/api/superadmin/admin/", formData);
-      if (res) {
-        toast.success(res.data.message);
-        onOpenChange();
+      // Check if an admin with the same email already exists
+      const adminsRef = collection(db, "admins");
+      const q = query(adminsRef, where("email", "==", data.email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        toast.error("Admin with this email already exists");
+        return;
       }
-    } catch (error: any) {
-      toast.error(error.response.data.error);
+
+      // Check if an admin with the same phone number already exists
+      const q2 = query(adminsRef, where("phoneNumber", "==", data.phoneNumber));
+      const querySnapshot2 = await getDocs(q2);
+
+      if (!querySnapshot2.empty) {
+        toast.error("Admin with this phone number already exists");
+        return;
+      }
+
+      // If no duplicate, add the new admin with moment for timestamps
+      await addDoc(adminsRef, {
+        ...data,
+        status: "active",
+        createdAt: moment().format(),
+        updatedAt: moment().format(),
+      });
+
+      toast.success("Admin added successfully");
+
+      form.reset();
+      onAdminAdded();
+      setIsOpen(false);
+    } catch (error) {
+      toast.error("Failed to add admin");
+      console.error("Error adding admin:", error);
     }
-  };
+  }
+
   return (
     <>
-      <Button onClick={onOpen}>Add New Admin</Button>
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          {(onClose) => (
-            <Card>
-              <form onSubmit={handleSubmit}>
-                <ModalHeader className="flex flex-col gap-1">
-                  Modal Title
-                </ModalHeader>
-                <ModalBody>
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="name">Name</Label>
-                      <Input
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        name="password"
-                        type="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                </ModalBody>
-                <ModalFooter>
-                  <Button onClick={onClose}>Close</Button>
-                  <Button type="submit">Action</Button>
-                </ModalFooter>
-              </form>
-            </Card>
-          )}
-        </ModalContent>
-      </Modal>
+      <Button onClick={() => setIsOpen(true)}>Add New Admin</Button>
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Admin</DialogTitle>
+            <DialogDescription>
+              Enter the details for the new admin. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="admin@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1234567890" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="sessionCost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Session Cost</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lotLimit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lot Limit</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(parseInt(e.target.value))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="queueLimit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Queue Limit</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(parseInt(e.target.value))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Enter password"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="submit">Save</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -1,5 +1,4 @@
 "use client";
-import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -10,7 +9,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -19,157 +17,269 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Lot, queueInterface } from "../queues/page";
 import { getUserData } from "@/utils";
+import { collection, query, where, getDocs, addDoc, doc, updateDoc } from "firebase/firestore";
+import { db } from "@/utils/firebase";
+import moment from "moment";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
 
-const AddNewQueueOwner = () => {
-  const [lots, setLots] = useState([]);
-  const [selectedLot, setSelectedLot] = useState("");
-  const [selectedQueue, setSelectedQueue] = useState("");
+const formSchema = z.object({
+  name: z.string().min(2, {
+    message: "Name must be at least 2 characters.",
+  }),
+  email: z.string().email({
+    message: "Please enter a valid email address.",
+  }),
+  phone: z.string().min(10, {
+    message: "Phone number must be at least 10 digits.",
+  }),
+  lotId: z.string().min(1, {
+    message: "Please select a lot.",
+  }),
+  queueId: z.string().min(1, {
+    message: "Please select a queue.",
+  }),
+});
+
+const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
+  const [lots, setLots] = useState<any[]>([]);
+  const [queues, setQueues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [queues, setQueues] = useState([]);
-  const userId = getUserData();
+  const user = getUserData();
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    lot: "",
-    queue: "",
-    user: "",
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      lotId: "",
+      queueId: "",
+    },
   });
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
 
   const fetchLots = async () => {
     try {
-      const response = await axios.get(`/api/admin/lots?user=${userId}`);
-      setLots(response.data.data);
+      const lotsCollection = collection(db, "lots");
+      const lotsQuery = query(lotsCollection, where("adminId", "==", user.id));
+      const lotsSnapshot = await getDocs(lotsQuery);
+      const lotsData = lotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLots(lotsData);
       setLoading(false);
     } catch (error: any) {
-      toast.error(error.response.data.error);
+      console.error("Error fetching lots:", error);
+      toast.error("Failed to fetch lots");
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchLots();
   }, []);
 
-  const fetchQueues = async () => {
+  const fetchQueues = async (lotId: string) => {
+    if (!lotId) return;
     try {
-      const res = await axios.get(
-        `/api/admin/queues?lotId=${selectedLot}&userId=${userId}`
+      const queuesCollection = collection(db, "queues");
+      const queuesQuery = query(
+        queuesCollection,
+        where("lotId", "==", lotId),
+        where("adminId", "==", user.id)
       );
-      setQueues(res.data.data);
+      const queuesSnapshot = await getDocs(queuesQuery);
+      const queuesData = queuesSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        isDisabled: doc.data().ownerId !== undefined
+      }));
+      setQueues(queuesData);
     } catch (error: any) {
       console.error("Error fetching queues:", error);
-      toast.error(error.response.data.error);
+      toast.error("Failed to fetch queues");
     }
   };
 
-  useEffect(() => {
-    if (selectedLot) fetchQueues();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLot]);
-
-  const handleSubmit = async () => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      formData.lot = selectedLot;
-      formData.queue = selectedQueue;
-      formData.user = userId;
-      console.log("🚀 ~ handleSubmit ~ formData:", formData);
-      const res = await axios.post("/api/admin/queue-owner", formData);
-      if (res) {
-        toast.success(res.data.message);
+      const selectedQueueData:any = queues.find(queue => queue.id === values.queueId);
+      if (!selectedQueueData) {
+        toast.error("Selected queue not found");
+        return;
       }
+
+      if (selectedQueueData.ownerId) {
+        toast.error("This queue already has an owner");
+        return;
+      }
+
+      // Check if user with same email exists
+      const emailQuery = query(collection(db, "queue_owners"), where("email", "==", values.email));
+      const emailQuerySnapshot = await getDocs(emailQuery);
+      if (!emailQuerySnapshot.empty) {
+        toast.error("A queue owner with this email already exists");
+        return;
+      }
+
+      // Check if user with same phone exists
+      const phoneQuery = query(collection(db, "queue_owners"), where("phone", "==", values.phone));
+      const phoneQuerySnapshot = await getDocs(phoneQuery);
+      if (!phoneQuerySnapshot.empty) {
+        toast.error("A queue owner with this phone number already exists");
+        return;
+      }
+
+      const queueOwnerData = {
+        ...values,
+        queueName: selectedQueueData.name,
+        adminId: user.id,
+        createdAt: moment().format(),
+        updatedAt: moment().format(),
+      };
+
+      // Add queue owner to the queue_owners collection
+      const queueOwnerRef = await addDoc(collection(db, "queue_owners"), queueOwnerData);
+
+      // Update the queue document with the owner's ID
+      const queueRef = doc(db, "queues", values.queueId);
+      await updateDoc(queueRef, {
+        ownerId: queueOwnerRef.id,
+        updatedAt: moment().format(),
+      });
+
+      toast.success("Queue owner added successfully");
+      onOwnerAdded();
+      form.reset();
+      fetchQueues(values.lotId);
     } catch (error: any) {
-      toast.error(error.response.data.error);
+      console.error("Error adding queue owner:", error);
+      toast.error("Failed to add queue owner");
     }
   };
+
   return (
-    <div>
-      <div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>Add New Queue Owner</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Queue Owner</DialogTitle>
-            </DialogHeader>
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button>Add New Queue Owner</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add New Queue Owner</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <FormField
+              control={form.control}
               name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
+            <FormField
+              control={form.control}
               name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
+            <FormField
+              control={form.control}
               name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              required
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <Label htmlFor="lot">Select Lot</Label>
-            <Select onValueChange={(e) => setSelectedLot(e)}>
-              <SelectTrigger className="">
-                <SelectValue placeholder="Select Lot" />
-              </SelectTrigger>
-              <SelectContent>
-                {lots.map((lot: Lot) => (
-                  <SelectItem
-                    key={lot._id}
-                    value={lot._id}
-                    disabled={lot.isDisabled}
-                  >
-                    {lot.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Label htmlFor="lot">Select Queue</Label>
-            <Select onValueChange={(e) => setSelectedQueue(e)}>
-              <SelectTrigger className="">
-                <SelectValue placeholder="Select Queue" />
-              </SelectTrigger>
-              <SelectContent>
-                {queues.map((queue: queueInterface) => (
-                  <SelectItem
-                    key={queue._id}
-                    value={queue._id}
-                    disabled={queue.isDisabled}
-                  >
-                    {queue.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div>
-              <Button onClick={handleSubmit}>Add Queue Owner</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
+            <FormField
+              control={form.control}
+              name="lotId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Select Lot</FormLabel>
+                  <Select onValueChange={(value) => {
+                    field.onChange(value);
+                    fetchQueues(value);
+                  }} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Lot" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {lots.map((lot: any) => (
+                        <SelectItem
+                          key={lot.id}
+                          value={lot.id}
+                          disabled={lot.isDisabled}
+                        >
+                          {lot.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="queueId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Select Queue</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Queue" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {queues.map((queue: any) => (
+                        <SelectItem
+                          key={queue.id}
+                          value={queue.id}
+                          disabled={queue.isDisabled}
+                        >
+                          {queue.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit">Add Queue Owner</Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 };
 

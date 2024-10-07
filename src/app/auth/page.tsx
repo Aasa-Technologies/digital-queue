@@ -1,4 +1,21 @@
 "use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { toast } from "sonner";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "@/utils/firebase"; // Import Firestore instance
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,76 +25,127 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import axios from "axios";
-import { useRouter } from "next/navigation";
-import React, { useState } from "react";
-import { toast } from "sonner";
 
-const LoginPage = () => {
+const loginSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z.string().min(2, { message: "Password is required" }),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async () => {
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsLoading(true);
     try {
-      const res = await axios.post("/api/auth", {
-        email: username,
-        password: password,
-      });
-      if (res) {
-        localStorage.setItem("userData", JSON.stringify(res.data.data));
-        toast.success(res.data.message);
-        if (res.data.data.role == "Admin") {
+      // Reference to the admin collection
+      const adminsRef = collection(db, "admins");
+
+      // Create a query to check if the email exists in the admin collection
+      const emailQuery = query(adminsRef, where("email", "==", data.email));
+
+      const emailSnapshot = await getDocs(emailQuery);
+
+      if (!emailSnapshot.empty) {
+        const userDoc = emailSnapshot.docs[0];
+        const userData = userDoc.data();
+
+        if (data.password === userData.password) {
+          // Store user data in local storage
+          localStorage.setItem(
+            "userData",
+            JSON.stringify({
+              id: userDoc.id,
+              ...userData,
+            })
+          );
+          toast.success("Login successful!");
+
+          // Redirect to the admin dashboard
           router.push("/admin/");
-        } else if (res.data.data.role == "SuperAdmin") {
-          router.push("/superadmin/");
+        } else {
+          toast.error("Incorrect password.");
         }
+      } else {
+        toast.error("No user found with this email.");
       }
     } catch (error: any) {
-      if (error.response) {
-        toast.error(error.response.data.error);
-      } else {
-        toast.error("An error occurred. Please try again later.");
-      }
+      toast.error("Login failed: " + (error.code || "Unknown error"));
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Card>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Account</CardTitle>
+          <CardTitle>Login</CardTitle>
           <CardDescription>
-            Make changes to your account here. Click save when you are done.
+            Enter your credentials to access your account.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="space-y-1">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleLogin}>Login</Button>
-        </CardFooter>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardContent className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Enter your password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Logging in..." : "Login"}
+              </Button>
+            </CardFooter>
+          </form>
+        </Form>
       </Card>
     </div>
   );
-};
-
-export default LoginPage;
+}

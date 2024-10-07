@@ -9,7 +9,6 @@ const Sidebar = () => {
     { label: "Queues", path: "/admin/queues" },
     { label: "Queue Owners", path: "/admin/queue-owners" },
     { label: "Queue Members", path: "/admin/queue-member" },
-    { label: "Queue Token", path: "/admin/queue-token" },
   ];
 
   return (

@@ -1,139 +1,357 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import AddNewLots from "./AddNewLot";
-import { toast } from "sonner";
-import axios from "axios";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Card } from "@/components/ui/card";
-import { Lot } from "../queues/page";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
-  TableCaption,
-  TableHead,
   TableCell,
+  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { db } from "@/utils/firebase";
+import {
+  collection,
+  query,
+  getDocs,
+  doc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import AddNewLot from "./AddNewLot";
+import { ChevronDown, Loader2, Pencil, ArrowUpDown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { toast } from "sonner";
 import { getUserData } from "@/utils";
-interface Token {
-  _id: string;
-  user: string;
-  lot: string;
-  queue: {
-    _id: string;
-    name: string;
-  };
-  session: string;
-  owner: {
-    _id: string;
-    name: string;
-  };
-  tokenNo: string;
-  status: string;
+
+type Lot = {
+  id: string;
+  name: string;
+  status: "active" | "disabled";
   createdAt: string;
   updatedAt: string;
-  __v: number;
-}
-
-const Lots = () => {
-  const [lots, setLots] = useState([]);
-  const userId = getUserData();
-  const [loading, setLoading] = useState(true);
-
-  const fetchLots = async () => {
-    try {
-      const response = await axios.get(
-        `/api/admin/lots/with-queue-tokens?user=${userId}`
-      );
-      setLots(response.data.data);
-      setLoading(false);
-    } catch (error: any) {
-      toast.error(error.response.data.error);
-      setLoading(false);
-    }
-  };
-  const assignNextLot = async (_id: string) => {
-    try {
-      const response = await axios.post(`/api/admin/lots/assign-next`, {
-        id: _id,
-        user: userId,
-      });
-      console.log("🚀 ~ assignNextLot ~ response:", response);
-      toast.success("Next Lot Assign Successfully");
-      fetchLots();
-      setLoading(false);
-    } catch (error: any) {
-      toast.error(error.response.data.error);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLots();
-  }, []);
-
-  return (
-    <div>
-      <div className="flex justify-between">
-        <h1>Lots</h1>
-        <AddNewLots />
-      </div>
-      <Card className="p-2 my-5">
-        {loading && <p>Loading...</p>}
-        {!loading && lots.length === 0 && <p>No data found</p>}
-        {!loading && lots.length > 0 && (
-          <Accordion type="single" collapsible>
-            {lots.map((lot: any) => (
-              <AccordionItem key={lot._id} value={lot._id}>
-                <AccordionTrigger className="pl-3">{lot.name}</AccordionTrigger>
-                <AccordionContent className="">
-                  {lot?.token && (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[100px]">Token No</TableHead>
-                          <TableHead>Queue</TableHead>
-                          <TableHead>Owner</TableHead>
-                          <TableHead>Member</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {lot?.token.map((token: any) => (
-                          <TableRow key={token._id}>
-                            <TableCell className="font-medium">
-                              {token.tokenNo}
-                            </TableCell>
-                            <TableCell>{token.queues.name}</TableCell>
-                            <TableCell>{token.queue_owners.name}</TableCell>
-                            <TableCell>{token.queue_members.name}</TableCell>
-                            <TableCell>{token.status}</TableCell>
-                            <TableCell>
-                              <Button onClick={() => assignNextLot(token._id)}>
-                                Assign Next Lot
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        )}
-      </Card>
-    </div>
-  );
 };
 
-export default Lots;
+type SortConfig = {
+  key: keyof Lot;
+  direction: "asc" | "desc";
+};
+
+const lotFormSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+});
+
+export default function Lots() {
+  const [user, setUser] = useState<any>({});
+
+  const [lots, setLots] = useState<Lot[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "disabled"
+  >("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [editingLot, setEditingLot] = useState<Lot | null>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: "updatedAt",
+    direction: "desc",
+  });
+
+  const form = useForm<z.infer<typeof lotFormSchema>>({
+    resolver: zodResolver(lotFormSchema),
+    defaultValues: {
+      name: "",
+    },
+  });
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const userInfo = getUserData();
+      setUser(userInfo);
+    };
+
+    fetchLots();
+    fetchUserData();
+  }, [user.id]);
+
+  const fetchLots = async () => {
+    setIsLoading(true);
+    try {
+      const adminId = user?.id; // Replace this with the actual user ID logic
+      if (!adminId) return;
+      const lotsRef = collection(db, "lots");
+      const querySnapshot = await getDocs(
+        query(lotsRef, where("adminId", "==", adminId))
+      );
+      const lotData = querySnapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+            status: doc.data().status || "active",
+          } as Lot)
+      );
+      setLots(lotData);
+    } catch (error) {
+      console.error("Error fetching lots:", error);
+      toast.error("Failed to fetch lots");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sortedLots = [...lots].sort((a, b) => {
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === "asc" ? -1 : 1;
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === "asc" ? 1 : -1;
+    }
+    return 0;
+  });
+
+  const filteredLots = sortedLots.filter(
+    (lot) =>
+      lot.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (statusFilter === "all" || lot.status === statusFilter)
+  );
+
+  const handleSort = (key: keyof Lot) => {
+    setSortConfig((prevConfig) => ({
+      key,
+      direction:
+        prevConfig.key === key && prevConfig.direction === "asc"
+          ? "desc"
+          : "asc",
+    }));
+  };
+
+  const handleEditLot = (lot: Lot) => {
+    setEditingLot(lot);
+    form.reset({
+      name: lot.name,
+    });
+  };
+
+  const onSubmit = async (data: z.infer<typeof lotFormSchema>) => {
+    if (!editingLot) return;
+
+    try {
+      const lotsRef = collection(db, "lots");
+
+      // Check if the name exists for a different lot
+      const nameQuery = query(
+        lotsRef,
+        where("name", "==", data.name),
+        where("id", "!=", editingLot.id)
+      );
+      const nameSnapshot = await getDocs(nameQuery);
+
+      if (!nameSnapshot.empty) {
+        toast.error("Lot with this name already exists");
+        return;
+      }
+
+      // Update lot data if no conflicts
+      const lotRef = doc(db, "lots", editingLot.id);
+      await updateDoc(lotRef, {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      });
+
+      toast.success("Lot updated successfully");
+      setEditingLot(null);
+      fetchLots();
+    } catch (error) {
+      console.error("Error updating lot:", error);
+      toast.error("Failed to update lot");
+    }
+  };
+
+  const handleToggleStatus = async (lot: Lot) => {
+    try {
+      const lotRef = doc(db, "lots", lot.id);
+      const newStatus = lot.status === "active" ? "disabled" : "active";
+      await updateDoc(lotRef, {
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success(
+        `Lot ${newStatus === "active" ? "activated" : "disabled"} successfully`
+      );
+      fetchLots();
+    } catch (error) {
+      console.error("Error toggling lot status:", error);
+      toast.error("Failed to update lot status");
+    }
+  };
+
+  return (
+    <div className="p-5 space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="font-extrabold text-2xl">Lots</h1>
+        <AddNewLot user={user} onLotAdded={fetchLots} />
+      </div>
+      <div className="flex justify-between items-center">
+        <Input
+          placeholder="Search by name"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              Status <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuCheckboxItem
+              checked={statusFilter === "all"}
+              onCheckedChange={() => setStatusFilter("all")}
+            >
+              All
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={statusFilter === "active"}
+              onCheckedChange={() => setStatusFilter("active")}
+            >
+              Active
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={statusFilter === "disabled"}
+              onCheckedChange={() => setStatusFilter("disabled")}
+            >
+              Disabled
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : filteredLots.length === 0 ? (
+        <div className="text-center py-10">
+          <h3 className="mt-2 text-sm font-semibold text-gray-900">
+            No lots found
+          </h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {searchTerm || statusFilter !== "all"
+              ? "Try adjusting your search or filter to find what you're looking for."
+              : "Get started by adding a new lot."}
+          </p>
+          <div className="mt-6">
+            <AddNewLot onLotAdded={fetchLots} />
+          </div>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead
+                onClick={() => handleSort("name")}
+                className="cursor-pointer"
+              >
+                Name{" "}
+                {sortConfig.key === "name" && (
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                )}
+              </TableHead>
+              <TableHead
+                onClick={() => handleSort("status")}
+                className="cursor-pointer"
+              >
+                Status{" "}
+                {sortConfig.key === "status" && (
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                )}
+              </TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredLots.map((lot) => (
+              <TableRow key={lot.id}>
+                <TableCell>{lot.name}</TableCell>
+                <TableCell>
+                  <Switch
+                    checked={lot.status === "active"}
+                    onCheckedChange={() => handleToggleStatus(lot)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Button onClick={() => handleEditLot(lot)} variant="outline">
+                    <Pencil className="mr-2 h-4 w-4" /> Edit
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+      <Dialog
+        open={Boolean(editingLot)}
+        onOpenChange={() => setEditingLot(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Lot</DialogTitle>
+            <DialogDescription>
+              Make changes to your lot here. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingLot(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Save</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

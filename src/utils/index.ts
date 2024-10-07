@@ -25,6 +25,6 @@ export const handleResponse = (response: any) => {
 export const getUserData = () => {
   const user = localStorage.getItem("userData");
   if (user) {
-    return JSON.parse(user)?._id;
+    return JSON.parse(user);
   }
 };

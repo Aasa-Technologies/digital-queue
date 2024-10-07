@@ -1,85 +1,173 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
+import moment from "moment"; // Import moment.js
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import axios from "axios";
 import { toast } from "sonner";
-import { getUserData } from "@/utils";
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { db } from "@/utils/firebase";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 
-const AddNewSessionModel = () => {
-  const userId = getUserData();
+// Validation schema
+const sessionSchema = z.object({
+  name: z.string().min(1, { message: "Name is required" }),
+  avgWaitingTime: z
+    .string()
+    .min(1, { message: "Average waiting time must be at least 1" }),
+});
 
-  const [formData, setFormData] = useState({
-    name: "",
-    user: userId,
+type SessionFormValues = z.infer<typeof sessionSchema>;
+
+const AddNewSessionModel = ({ user }: any) => {
+  const [hasActiveSession, setHasActiveSession] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false); // State to manage dialog open/close
+
+  const form = useForm<SessionFormValues>({
+    resolver: zodResolver(sessionSchema),
+    defaultValues: {
+      name: "",
+      avgWaitingTime: "",
+    },
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+  // Check for active sessions on component mount
+  const checkActiveSession = async () => {
+    if (!user?.id) return; // Exit if userId is not available
+    const sessionsRef = collection(db, "sessions");
+    const activeSessionQuery = query(
+      sessionsRef,
+      where("adminId", "==", user?.id),
+      where("status", "==", "active")
+    );
+
+    const querySnapshot = await getDocs(activeSessionQuery);
+    setHasActiveSession(!querySnapshot.empty);
   };
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    checkActiveSession();
+  }, [user]);
+
+  const onSubmit = async (data: SessionFormValues) => {
+    if (hasActiveSession) {
+      toast.error(
+        "You cannot create a new session while you have an active session."
+      );
+      return;
+    }
+
     try {
-      const res = await axios.post("/api/admin/session", formData);
-      if (res) {
-        toast.success(res.data.message);
-      }
+      const sessionData = {
+        ...data,
+        adminId: user?.id,
+        startTime: moment().format(),
+        status: "active",
+        createdAt: moment().format(),
+        updatedAt: moment().format(),
+      };
+
+      await addDoc(collection(db, "sessions"), sessionData);
+      toast.success("Session added successfully!");
+
+      // Reset the form fields after submission
+      form.reset();
+      checkActiveSession();
+
+      // Close the dialog
+      setDialogOpen(false);
     } catch (error: any) {
-      if (error.response) {
-        toast.error(error.response.data.error);
-      } else {
-        toast.error("An error occurred. Please try again later.");
-      }
+      console.error("Error adding session: ", error);
+      toast.error("An error occurred. Please try again later.");
     }
   };
 
   return (
-    <>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button>Add New Session</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Session</DialogTitle>
-          </DialogHeader>
-          <Label htmlFor="name">Name</Label>
-          <Input
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-          {/* <Label htmlFor="user">User</Label>
-          <Input
-            id="user"
-            name="user"
-            value={formData.user}
-            onChange={handleChange}
-            required
-          /> */}
-          <div>
-            <Button onClick={handleSubmit}>Add Session</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <DialogTrigger asChild>
+        <Button onClick={() => setDialogOpen(true)}>Add New Session</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add New Session</DialogTitle>
+          {hasActiveSession && (
+            <p className="text-red-500">
+              You have an active session. Cannot create a new session.
+            </p>
+          )}
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Session Name" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    This will be the name of the session.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="avgWaitingTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Average Waiting Time (minutes)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="Enter average waiting time"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div>
+              <Button type="submit" disabled={hasActiveSession}>
+                Add Session
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 };
 

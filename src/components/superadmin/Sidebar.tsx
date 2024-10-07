@@ -11,7 +11,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="border-red-700 border-2">
+    <div className="border-r border-gray-500">
       <div className="h-screen bg-white dark:bg-slate-900">
         <aside
           id="sidebar"
@@ -20,7 +20,7 @@ const Sidebar = () => {
         >
           <div className="flex h-full flex-col overflow-y-auto border-r border-slate-200 bg-white px-3 py-4 dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-10 flex items-center rounded-lg px-3 py-2 text-slate-900 dark:text-white">
-              <span className="ml-3 text-base font-semibold">Taxonomy</span>
+              <span className="ml-3 text-base font-semibold">Digital Queue</span>
             </div>
             <ul className="space-y-2 text-sm font-medium">
               {options.map((option, index) => (
