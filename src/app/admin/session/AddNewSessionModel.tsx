@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import moment from "moment"; // Import moment.js
+import moment from "moment";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,6 @@ import { toast } from "sonner";
 import {
   addDoc,
   collection,
-  serverTimestamp,
   query,
   where,
   getDocs,
@@ -45,8 +44,8 @@ const sessionSchema = z.object({
 type SessionFormValues = z.infer<typeof sessionSchema>;
 
 const AddNewSessionModel = ({ user }: any) => {
-  const [hasActiveSession, setHasActiveSession] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false); // State to manage dialog open/close
+  const [hasSessionToday, setHasSessionToday] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema),
@@ -56,28 +55,31 @@ const AddNewSessionModel = ({ user }: any) => {
     },
   });
 
-  // Check for active sessions on component mount
-  const checkActiveSession = async () => {
-    if (!user?.id) return; // Exit if userId is not available
+  // Check for any sessions created today
+  const checkSessionToday = async () => {
+    if (!user?.id) return;
     const sessionsRef = collection(db, "sessions");
-    const activeSessionQuery = query(
+    const today = moment().startOf('day');
+    const tomorrow = moment(today).add(1, 'days');
+    const sessionTodayQuery = query(
       sessionsRef,
       where("adminId", "==", user?.id),
-      where("status", "==", "active")
+      where("createdAt", ">=", today.toDate()),
+      where("createdAt", "<", tomorrow.toDate())
     );
 
-    const querySnapshot = await getDocs(activeSessionQuery);
-    setHasActiveSession(!querySnapshot.empty);
+    const querySnapshot = await getDocs(sessionTodayQuery);
+    setHasSessionToday(!querySnapshot.empty);
   };
 
   useEffect(() => {
-    checkActiveSession();
+    checkSessionToday();
   }, [user]);
 
   const onSubmit = async (data: SessionFormValues) => {
-    if (hasActiveSession) {
+    if (hasSessionToday) {
       toast.error(
-        "You cannot create a new session while you have an active session."
+        "You have already created a session today. Only one session per day is allowed."
       );
       return;
     }
@@ -95,11 +97,8 @@ const AddNewSessionModel = ({ user }: any) => {
       await addDoc(collection(db, "sessions"), sessionData);
       toast.success("Session added successfully!");
 
-      // Reset the form fields after submission
       form.reset();
-      checkActiveSession();
-
-      // Close the dialog
+      checkSessionToday();
       setDialogOpen(false);
     } catch (error: any) {
       console.error("Error adding session: ", error);
@@ -115,9 +114,9 @@ const AddNewSessionModel = ({ user }: any) => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add New Session</DialogTitle>
-          {hasActiveSession && (
+          {hasSessionToday && (
             <p className="text-red-500">
-              You have an active session. Cannot create a new session.
+              You have already created a session today. Only one session per day is allowed.
             </p>
           )}
         </DialogHeader>
@@ -160,7 +159,7 @@ const AddNewSessionModel = ({ user }: any) => {
             />
 
             <div>
-              <Button type="submit" disabled={hasActiveSession}>
+              <Button type="submit" disabled={hasSessionToday}>
                 Add Session
               </Button>
             </div>

@@ -1,17 +1,19 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
-import { db } from "@/utils/firebase"; // Import your Firestore database instance
+import { db } from "@/utils/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { getUserData } from "@/utils";
 import AddNewSessionModel from "./AddNewSessionModel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface SessionData {
   id: string;
@@ -28,6 +30,7 @@ const Session = () => {
   const [user, setUser] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState<SessionData[]>([]);
+  const [todaySession, setTodaySession] = useState<SessionData | null>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -49,10 +52,14 @@ const Session = () => {
         const sessions: SessionData[] = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        })) as SessionData[]; // Ensure type safety here
+        })) as SessionData[];
 
-        console.log(">>>>", sessions);
-        setSessionData(sessions);
+        const today = new Date().toDateString();
+        const todaySessionData = sessions.find(
+          (session) => new Date(session.startTime).toDateString() === today
+        );
+        setTodaySession(todaySessionData || null);
+        setSessionData(sessions.filter((session) => session.id !== todaySessionData?.id));
       } catch (error: any) {
         console.error("Error fetching sessions: ", error);
         toast.error("Failed to fetch sessions.");
@@ -67,45 +74,66 @@ const Session = () => {
 
   return (
     <div>
-      <div className="flex justify-between">
-        <h1>New Session</h1>
+      <div className="flex justify-between mb-5">
+        <h1 className="text-2xl font-bold">Sessions</h1>
         <AddNewSessionModel user={user} />
       </div>
-      <Card className="p-2 my-5">
-        {loading && <p>Loading...</p>}
-        {!loading && sessionData.length === 0 && <p>No sessions found.</p>}
-        {!loading && sessionData.length > 0 && (
-          <Accordion type="single" collapsible>
-            {sessionData.map((session) => (
-              <AccordionItem key={session.id} value={session.id}>
-                <AccordionTrigger className="pl-3">
-                  {session.name}
-                </AccordionTrigger>
-                <AccordionContent className="">
-                  <div className="flex justify-between">
-                    <p className="flex flex-col text-center">
-                      <strong>Start Time:</strong>
-                      {new Date(session.startTime).toLocaleString()}
-                    </p>
-                    <p className="flex flex-col text-center">
-                      <strong>Average Waiting Time:</strong>
-                      {session.avgWaitingTime} minutes
-                    </p>
-                    <p className="flex flex-col text-center">
-                      <strong>Created At:</strong>
-                      {new Date(session.createdAt).toLocaleString()}
-                    </p>
-                    <p className="flex flex-col text-center">
-                      <strong>Status</strong>
-                      {session.status}
-                    </p>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        )}
-      </Card>
+      
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        <>
+          <Card className="p-4 mb-5">
+            <h2 className="text-xl font-semibold mb-3">Today's Session</h2>
+            {todaySession ? (
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <strong>Name:</strong> {todaySession.name}
+                </div>
+                <div>
+                  <strong>Start Time:</strong> {new Date(todaySession.startTime).toLocaleString()}
+                </div>
+                <div>
+                  <strong>Average Waiting Time:</strong> {todaySession.avgWaitingTime} minutes
+                </div>
+                <div>
+                  <strong>Status:</strong> {todaySession.status}
+                </div>
+              </div>
+            ) : (
+              <p>No session scheduled for today.</p>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <h2 className="text-xl font-semibold mb-3">All Sessions</h2>
+            {sessionData.length === 0 ? (
+              <p>No other sessions found.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Start Time</TableHead>
+                    <TableHead>Average Waiting Time</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessionData.map((session) => (
+                    <TableRow key={session.id}>
+                      <TableCell>{session.name}</TableCell>
+                      <TableCell>{new Date(session.startTime).toLocaleString()}</TableCell>
+                      <TableCell>{session.avgWaitingTime} minutes</TableCell>
+                      <TableCell>{session.status}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   );
 };

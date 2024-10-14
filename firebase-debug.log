@@ -1,0 +1,51 @@
+[debug] [2024-10-14T12:25:09.198Z] ----------------------------------------------------------------------
+[debug] [2024-10-14T12:25:09.202Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\msg_v\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init hosting
+[debug] [2024-10-14T12:25:09.202Z] CLI Version:   13.20.2
+[debug] [2024-10-14T12:25:09.203Z] Platform:      win32
+[debug] [2024-10-14T12:25:09.203Z] Node Version:  v20.17.0
+[debug] [2024-10-14T12:25:09.203Z] Time:          Mon Oct 14 2024 17:55:09 GMT+0530 (India Standard Time)
+[debug] [2024-10-14T12:25:09.203Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2024-10-14T12:25:09.308Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2024-10-14T12:25:09.309Z] > authorizing via signed-in user (vikas.patel@aasa.tech)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Users\msg_v\Documents\digital-queue
+
+Before we get started, keep in mind:
+
+  * You are initializing within an existing Firebase project directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] but for now we'll just set up a default project.
+[info] 
+[debug] [2024-10-14T12:25:12.083Z] Using project from CLI flag: digital-queue-29ce0
+[debug] [2024-10-14T12:25:12.086Z] Checked if tokens are valid: true, expires at: 1728912033793
+[debug] [2024-10-14T12:25:12.087Z] Checked if tokens are valid: true, expires at: 1728912033793
+[debug] [2024-10-14T12:25:12.090Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/digital-queue-29ce0 [none]
+[debug] [2024-10-14T12:25:12.845Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/digital-queue-29ce0 200
+[debug] [2024-10-14T12:25:12.845Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/digital-queue-29ce0 {"projectId":"digital-queue-29ce0","projectNumber":"359684737046","displayName":"digital-queue","name":"projects/digital-queue-29ce0","resources":{"hostingSite":"digital-queue-29ce0"},"state":"ACTIVE","etag":"1_f2eeb80b-ee65-4ac8-89fb-350888f12893"}
+[info] i  Using project digital-queue-29ce0 (digital-queue) 
+[info] 
+=== Hosting Setup
+[debug] [2024-10-14T12:25:12.859Z] Checked if tokens are valid: true, expires at: 1728912033793
+[debug] [2024-10-14T12:25:12.859Z] Checked if tokens are valid: true, expires at: 1728912033793
+[debug] [2024-10-14T12:25:12.860Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/digital-queue-29ce0 [none]
+[debug] [2024-10-14T12:25:13.304Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/digital-queue-29ce0 200
+[debug] [2024-10-14T12:25:13.305Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/digital-queue-29ce0 {"projectId":"digital-queue-29ce0","projectNumber":"359684737046","displayName":"digital-queue","name":"projects/digital-queue-29ce0","resources":{"hostingSite":"digital-queue-29ce0"},"state":"ACTIVE","etag":"1_f2eeb80b-ee65-4ac8-89fb-350888f12893"}
+[info] 
+[info] Your public directory is the folder (relative to your project directory) that
+[info] will contain Hosting assets to be uploaded with firebase deploy. If you
+[info] have a build process for your assets, use your build's output directory.
+[info] 

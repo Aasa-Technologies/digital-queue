@@ -74,6 +74,7 @@ export default function AddNewQueueModel({
         ...data,
         lotId: lotId,
         adminId: user.id,
+        ownerId: "",
         createdAt: moment().format(),
         updatedAt: moment().format(),
       };

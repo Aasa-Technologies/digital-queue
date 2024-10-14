@@ -23,7 +23,7 @@ export const handleResponse = (response: any) => {
 };
 
 export const getUserData = () => {
-  const user = localStorage.getItem("userData");
+  const user = localStorage.getItem("userData")|| null;
   if (user) {
     return JSON.parse(user);
   }
