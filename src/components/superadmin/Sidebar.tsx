@@ -5,9 +5,8 @@ const Sidebar = () => {
   // Array of options with labels and paths
   const options = [
     { label: "Admin", path: "/superadmin/admin" },
-    { label: "Customers", path: "/customers" },
-    { label: "Products", path: "/products" },
-    { label: "Settings", path: "/settings" },
+    { label: "Reports", path: "/superadmin/reports" },
+    { label: "Settings", path: "/superadmin/settings" },
   ];
 
   return (

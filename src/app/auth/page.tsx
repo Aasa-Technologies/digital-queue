@@ -69,7 +69,9 @@ export default function LoginPage() {
         const userDoc = emailSnapshot.docs[0];
         const userData = userDoc.data();
 
-        if (data.password === userData.password) {
+        if (userData.status === "inactive") {
+          toast.error("Your account is inactive. Please contact the administrator.");
+        } else if (data.password === userData.password) {
           // Store user data in local storage
           localStorage.setItem(
             "userData",

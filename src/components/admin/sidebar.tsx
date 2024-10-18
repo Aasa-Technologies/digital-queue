@@ -13,7 +13,7 @@ const Sidebar = ( ) => {
     { label: "Lots", path: "/admin/lots" },
     { label: "Queues", path: "/admin/queues" },
     { label: "Queue Owners", path: "/admin/queue-owners" },
-    { label: "Queue Members", path: "/admin/queue-member" },
+    { label: "Rebalance Queues", path: "/admin/rebalance-queues" },
     { label: "Reports", path: "/admin/reports" },
   ];
 
@@ -23,10 +23,8 @@ const Sidebar = ( ) => {
         <div className="flex-1 bg-white dark:bg-slate-900 shadow-lg">
           <aside id="sidebar" className="flex flex-col h-full" aria-label="Sidebar">
             <div className="flex flex-col flex-1 border-r border-slate-200 bg-white px-3 py-4 dark:border-slate-700 dark:bg-slate-900">
-              <div className="mb-10 flex items-center rounded-lg px-3 py-2 text-slate-900 dark:text-white">
-                <span className="ml-3 text-base font-semibold">Digital Queue</span>
-              </div>
-              <ul className="flex-1 space-y-2 text-sm font-medium overflow-y-auto">
+            
+              <ul className="flex-1 space-y-2 text-sm font-medium overflow-y-auto ">
                 {options.map((option, index) => (
                   <li key={index}>
                     <Link

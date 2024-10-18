@@ -118,20 +118,20 @@ const Session = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Start Time</TableHead>
                     <TableHead>Average Waiting Time</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Created At</TableHead>
+                
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sessionData.map((session) => (
                     <TableRow key={session.id}>
                       <TableCell>{session.name}</TableCell>
+                      <TableCell>{session.avgWaitingTime} minutes</TableCell>
                       <TableCell>
                         {new Date(session.startTime).toLocaleString()}
                       </TableCell>
-                      <TableCell>{session.avgWaitingTime} minutes</TableCell>
-                      <TableCell>{session.status}</TableCell>
+               
                     </TableRow>
                   ))}
                 </TableBody>

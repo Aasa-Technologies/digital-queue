@@ -104,7 +104,7 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
       const queuesData = queuesSnapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data(),
-        isDisabled: doc.data().ownerId !== undefined
+        isDisabled: doc.data().ownerId !== ""
       }));
       setQueues(queuesData);
     } catch (error: any) {

@@ -94,7 +94,7 @@ export default function Admins() {
     "all" | "active" | "disabled"
   >("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<any>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "updatedAt",
     direction: "desc",
@@ -234,7 +234,7 @@ export default function Admins() {
         updatedAt: new Date().toISOString(),
       });
       toast.success(
-        `Admin ${
+        `Admin ₹ {
           newStatus === "active" ? "activated" : "disabled"
         } successfully`
       );
@@ -336,7 +336,7 @@ export default function Admins() {
                   <ArrowUpDown className="ml-2 h-4 w-4 inline" />
                 )}
               </TableHead>
-              <TableHead
+              {/* <TableHead
                 onClick={() => handleSort("lotLimit")}
                 className="cursor-pointer"
               >
@@ -353,7 +353,7 @@ export default function Admins() {
                 {sortConfig.key === "queueLimit" && (
                   <ArrowUpDown className="ml-2 h-4 w-4 inline" />
                 )}
-              </TableHead>
+              </TableHead> */}
               <TableHead
                 onClick={() => handleSort("status")}
                 className="cursor-pointer"
@@ -381,9 +381,9 @@ export default function Admins() {
                 <TableCell>{admin.name}</TableCell>
                 <TableCell>{admin.email}</TableCell>
                 <TableCell>{admin.phoneNumber}</TableCell>
-                <TableCell>${admin.sessionCost.toFixed(2)}</TableCell>
-                <TableCell>{admin.lotLimit}</TableCell>
-                <TableCell>{admin.queueLimit}</TableCell>
+                <TableCell>₹{admin.sessionCost.toFixed(2)}</TableCell>
+                {/* <TableCell>{admin.lotLimit}</TableCell>
+                <TableCell>{admin.queueLimit}</TableCell> */}
                 <TableCell>
                   <Switch
                     checked={admin.status === "active"}
@@ -407,7 +407,7 @@ export default function Admins() {
           </TableBody>
         </Table>
       )}
-      <Dialog open={!!editingAdmin} onOpenChange={() => setEditingAdmin(null)}>
+      <Dialog open={editingAdmin} onOpenChange={() => setEditingAdmin(null)}>
         <DialogContent className="sm:max-w-screen-md">
           <DialogHeader>
             <DialogTitle>Edit Admin</DialogTitle>
