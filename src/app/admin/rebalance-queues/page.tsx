@@ -24,6 +24,7 @@ import {
   orderBy,
   limit,
   getDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import {
@@ -163,180 +164,195 @@ const QueueMember = () => {
       toast.error("Failed to fetch sessions.");
     }
   };
-  const rebalanceQueues = async () => {
+
+  const rebalanceQueues = async ( lotId: string) => {
     try {
-      await runTransaction(db, async (transaction) => {
-        // Step 1: Get all active lots for the admin
-        const lotsRef = collection(db, "lots");
-        const lotQuery = query(
-          lotsRef,
-          where("adminId", "==", user.id),
-          where("status", "==", "active"),
-          orderBy("createdAt", "asc")
+      console.log(`[DEBUG] Starting queue rebalancing for lot ${lotId} and admin ${user.id}`);
+  
+      // Step 1: Get all active queues in the lot
+      const queuesRef = collection(db, "queues");
+      const queueQuery = query(
+        queuesRef,
+        where("adminId", "==", user.id),
+        where("lotId", "==", lotId),
+        where("status", "==", "active")
+      );
+      const queueSnapshot = await getDocs(queueQuery);
+  
+      console.log(`[DEBUG] Found ${queueSnapshot.size} active queues in the lot`);
+  
+      if (queueSnapshot.empty) {
+        console.log("[DEBUG] No active queues found in this lot. Exiting.");
+        return;
+      }
+  
+      // Step 2: Calculate the average queue length
+      let totalQueueLength = 0;
+      const queueLengths: { [key: string]: number } = {};
+  
+      for (const queueDoc of queueSnapshot.docs) {
+        const queueId = queueDoc.id;
+        const queueMembersRef = collection(db, "queue_members");
+        const queueMembersQuery = query(
+          queueMembersRef,
+          where("queueId", "==", queueId),
+          where("status", "in", ["waiting", "processing"])
         );
-        const lotSnapshot = await getDocs(lotQuery);
-        const lots = lotSnapshot.docs.map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-        }));
-
-        // Step 2: Gather all queues and calculate the load
-        const lotQueuesMap: any = {};
-        let totalMembers = 0;
-
-        for (const lot of lots) {
-          const queuesRef = collection(db, "queues");
-          const queueQuery = query(
-            queuesRef,
-            where("lotId", "==", lot.id),
-            where("status", "==", "active"),
-            where("ownerId", "!=", "")
-          );
-          const queueSnapshot = await getDocs(queueQuery);
-          const lotQueues = [];
-
-          for (const queueDoc of queueSnapshot.docs) {
-            const queueData: any = { ...queueDoc.data(), id: queueDoc.id };
-            const queueMembersRef = collection(db, "queue_members");
-            const queueMembersQuery = query(
-              queueMembersRef,
-              where("queueId", "==", queueDoc.id),
-              where("status", "in", ["waiting", "processing"])
-            );
-            const queueMembersSnapshot = await getDocs(queueMembersQuery);
-            const queueLength = queueMembersSnapshot.size;
-
-            queueData.currentSize = queueLength;
-            totalMembers += queueLength;
-            lotQueues.push(queueData);
-          }
-
-          lotQueuesMap[lot.id] = lotQueues;
+        const queueMembersSnapshot = await getDocs(queueMembersQuery);
+        const queueLength = queueMembersSnapshot.size;
+  
+        totalQueueLength += queueLength;
+        queueLengths[queueId] = queueLength;
+        console.log(`[DEBUG] Queue ${queueId} has ${queueLength} members`);
+      }
+  
+      const averageQueueLength = Math.floor(totalQueueLength / queueSnapshot.size);
+      console.log(`[DEBUG] Average queue length: ${averageQueueLength}`);
+  
+      // Step 3: Identify queues to rebalance
+      const queuesToRebalance = Object.entries(queueLengths)
+        .filter(([_, length]) => length > averageQueueLength + 1)
+        .sort((a, b) => b[1] - a[1]);
+  
+      console.log(`[DEBUG] Queues to rebalance: ${queuesToRebalance.map(([id, _]) => id).join(', ')}`);
+  
+      if (queuesToRebalance.length === 0) {
+        console.log("[DEBUG] Queues are already balanced. Exiting.");
+        return;
+      }
+  
+      // Step 4: Find the shortest queue
+      const shortestQueue = Object.entries(queueLengths)
+        .sort((a, b) => a[1] - b[1])[0];
+  
+      console.log(`[DEBUG] Shortest queue: ${shortestQueue[0]} with ${shortestQueue[1]} members`);
+  
+      // Step 5: Get the session data for average waiting time
+      const sessionsRef = collection(db, "sessions");
+      const sessionQuery = query(
+        sessionsRef,
+        where("adminId", "==", user.id),
+        where("createdAt", ">=", moment().startOf("day").toDate()),
+        limit(1)
+      );
+      const sessionSnapshot = await getDocs(sessionQuery);
+  
+      if (sessionSnapshot.empty) {
+        console.log("[DEBUG] No active session found for today. Exiting.");
+        return;
+      }
+  
+      const sessionData = sessionSnapshot.docs[0].data();
+      const avgWaitingTime = sessionData.avgWaitingTime || 10; // Default to 10 minutes if not set
+  
+      // Step 6: Rebalance queues
+      const batch = writeBatch(db);
+  
+      for (const [queueId, queueLength] of queuesToRebalance) {
+        const membersToMove = queueLength - averageQueueLength;
+        console.log(`[DEBUG] Queue ${queueId}: moving ${membersToMove} members`);
+  
+        // Get members to move
+        const queueMembersRef = collection(db, "queue_members");
+        const membersToMoveQuery = query(
+          queueMembersRef,
+          where("queueId", "==", queueId),
+          where("status", "in", ["waiting"]),
+          orderBy("position", "desc"),
+          orderBy("joinTime", "desc")
+        );
+        const membersToMoveSnapshot = await getDocs(membersToMoveQuery);
+  
+        console.log(`[DEBUG] Found ${membersToMoveSnapshot.size} members to move from queue ${queueId}`);
+  
+        // Get the last member in the shortest queue
+        const lastMemberQuery = query(
+          queueMembersRef,
+          where("queueId", "==", shortestQueue[0]),
+          where("status", "in", ["waiting", "processing"]),
+          orderBy("position", "desc"),
+          limit(1)
+        );
+        const lastMemberSnapshot = await getDocs(lastMemberQuery);
+        let lastPersonEndTime = moment().toDate();
+        let newPosition = 1;
+  
+        if (!lastMemberSnapshot.empty) {
+          const lastMember = lastMemberSnapshot.docs[0].data();
+          lastPersonEndTime = lastMember.endTime.toDate();
+          newPosition = lastMember.position + 1;
         }
-
-        // Step 3: Calculate the average members per queue based on the session
-        const averageMembers = todaySession.avgWaitingTime || 10;
-
-        // Step 4: Rebalance members for each lot
-        for (const lotId in lotQueuesMap) {
-          const lotQueues = lotQueuesMap[lotId];
-          const overloadedQueues = [];
-          const underloadedQueues = [];
-
-          // Separate overloaded and underloaded queues within the lot
-          for (const queue of lotQueues) {
-            if (queue.currentSize > averageMembers) {
-              overloadedQueues.push(queue);
-            } else if (queue.currentSize < averageMembers) {
-              underloadedQueues.push(queue);
-            }
-          }
-
-          // Step 5: Rebalance members within the lot
-          for (const overloadedQueue of overloadedQueues) {
-            const excessMembersCount =
-              overloadedQueue.currentSize - averageMembers;
-
-            // Fetch the members that need to be reassigned
-            const queueMembersRef = collection(db, "queue_members");
-            const membersQuery = query(
-              queueMembersRef,
-              where("queueId", "==", overloadedQueue.id),
-              where("status", "in", ["waiting", "processing"]),
-              orderBy("createdAt", "desc"),
-              limit(excessMembersCount)
-            );
-            const membersSnapshot = await getDocs(membersQuery);
-            const membersToMove: any = membersSnapshot.docs.map((doc) => ({
-              ...doc.data(),
-              id: doc.id,
-            }));
-
-            // Move members to underloaded queues within the same lot
-            for (const member of membersToMove) {
-              if (underloadedQueues.length === 0) break;
-
-              // Always move to the first underloaded queue
-              let underloadedQueue = underloadedQueues[0];
-
-              // Determine new position in the underloaded queue
-              const newPosition = underloadedQueue.currentSize + 1;
-
-              // Fetch the last member in the underloaded queue to calculate new times
-              const lastMemberQuery = query(
-                collection(db, "queue_members"),
-                where("queueId", "==", underloadedQueue.id),
-                where("status", "in", ["waiting", "processing"]),
-                orderBy("position", "desc"),
-                limit(1)
-              );
-              const lastMemberSnapshot = await getDocs(lastMemberQuery);
-              let startTime, endTime, waitingTime;
-
-              const averageWaitTime = todaySession.avgWaitingTime || 10;
-
-              if (!lastMemberSnapshot.empty) {
-                const lastMember = lastMemberSnapshot.docs[0].data();
-                const lastEndTime = lastMember.endTime.toDate();
-
-                // Start after the last member ends
-                startTime = moment(lastEndTime);
-                endTime = moment(startTime)
-                  .add(averageWaitTime, "minutes")
-                  .toDate();
-                waitingTime = moment(endTime).diff(
-                  moment(startTime),
-                  "minutes"
-                );
-              } else {
-                // If no members in queue, start now
-                startTime = serverTimestamp();
-                endTime = moment().add(averageWaitTime, "minutes").toDate();
-                waitingTime = averageWaitTime;
-              }
-
-              // Reassign the member to the underloaded queue
-              const newQueueMemberRef = doc(db, "queue_members", member.id);
-
-              transaction.update(newQueueMemberRef, {
-                queueId: underloadedQueue.id,
-                lotId: underloadedQueue.lotId,
-                position: newPosition,
-                startTime: startTime,
-                endTime: endTime,
-                waitingTime: waitingTime,
-                updatedAt: serverTimestamp(),
-              });
-
-              // Update the underloaded queue stats
-              transaction.update(doc(db, "queues", underloadedQueue.id), {
-                currentSize: increment(1),
-              });
-              underloadedQueue.currentSize += 1;
-
-              // Update the overloaded queue stats
-              transaction.update(doc(db, "queues", overloadedQueue.id), {
-                currentSize: increment(-1),
-              });
-              overloadedQueue.currentSize -= 1;
-
-              // If the underloaded queue becomes balanced, remove it from the list
-              if (underloadedQueue.currentSize >= averageMembers) {
-                underloadedQueues.shift();
-              }
-            }
-          }
+  
+        // Move members to the shortest queue
+        for (let i = 0; i < membersToMove && i < membersToMoveSnapshot.size; i++) {
+          const memberDoc = membersToMoveSnapshot.docs[i];
+          const memberData = memberDoc.data();
+  
+          console.log(`[DEBUG] Moving member ${memberData.userId} from queue ${queueId} to queue ${shortestQueue[0]}`);
+  
+          const joinTime = serverTimestamp();
+          const endTime = moment(lastPersonEndTime).add(avgWaitingTime, "minutes").toDate();
+          const waitingTime = moment(endTime).diff(moment(), "minutes");
+  
+          // Update member's queue, position, and time-related fields
+          batch.update(memberDoc.ref, {
+            queueId: shortestQueue[0],
+            position: newPosition,
+            joinTime: joinTime,
+            endTime: endTime,
+            waitingTime: waitingTime,
+            updatedAt: serverTimestamp()
+          });
+  
+          lastPersonEndTime = endTime;
+          newPosition++;
         }
-
-        // Step 6: Success message
-        toast.success("Queues have been successfully rebalanced!");
-      });
+  
+        // Update positions of remaining members in the original queue
+        const remainingMembersQuery = query(
+          queueMembersRef,
+          where("queueId", "==", queueId),
+          where("status", "in", ["waiting", "processing"]),
+          orderBy("position", "asc")
+        );
+        const remainingMembersSnapshot = await getDocs(remainingMembersQuery);
+  
+        console.log(`[DEBUG] Updating positions for ${remainingMembersSnapshot.size} remaining members in queue ${queueId}`);
+  
+        let lastEndTime = moment().toDate();
+        remainingMembersSnapshot.docs.forEach((doc, index) => {
+          const memberData = doc.data();
+          console.log(`[DEBUG] Updating position for member ${memberData.userId} to ${index + 1}`);
+          
+          const endTime = moment(lastEndTime).add(avgWaitingTime, "minutes").toDate();
+          const waitingTime = moment(endTime).diff(moment(), "minutes");
+  
+          batch.update(doc.ref, {
+            position: index + 1,
+            endTime: endTime,
+            waitingTime: waitingTime,
+            updatedAt: serverTimestamp()
+          });
+  
+          lastEndTime = endTime;
+        });
+      }
+  
+      // Commit the batch
+      await batch.commit();
+  
+      console.log("[DEBUG] Batch committed. Queues rebalanced successfully");
     } catch (error) {
-      console.error("Error rebalancing queues:", error);
-      toast.error("An error occurred while rebalancing queues.");
+      console.error("[DEBUG] Error rebalancing queues:", error);
     }
   };
+  
 
+const handleRebalance = async () => {
+  lots.forEach(async (lot) => {
+    await rebalanceQueues(lot.id);
+  });
+};
   return (
     <div>
       <Card className="p-3 py-5">
@@ -347,7 +363,7 @@ const QueueMember = () => {
             </h1>
           </div>
         </div>
-        <Button onClick={() => rebalanceQueues()} className="mb-4">
+        <Button onClick={handleRebalance} className="mb-4">
           Rebalance Queue
         </Button>
       </Card>

@@ -38,14 +38,7 @@ const adminFormSchema = z.object({
   sessionCost: z
     .number()
     .positive({ message: "Session cost must be positive" }),
-  lotLimit: z
-    .number()
-    .int()
-    .positive({ message: "Lot limit must be a positive integer" }),
-  queueLimit: z
-    .number()
-    .int()
-    .positive({ message: "Queue limit must be a positive integer" }),
+  
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
@@ -74,8 +67,6 @@ export default function AddNewAdmin({
       phoneNumber: "",
       name: "",
       sessionCost: 0,
-      lotLimit: 0,
-      queueLimit: 0,
       password: "", // Initialize password field
     },
   });
@@ -193,44 +184,7 @@ export default function AddNewAdmin({
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="lotLimit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lot Limit</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value))
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="queueLimit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Queue Limit</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value))
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+             
                 <FormField
                   control={form.control}
                   name="password"

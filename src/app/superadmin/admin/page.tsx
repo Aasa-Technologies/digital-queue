@@ -56,8 +56,6 @@ type Admin = {
   email: string;
   phoneNumber: string;
   sessionCost: number;
-  lotLimit: number;
-  queueLimit: number;
   status: "active" | "disabled";
   createdAt: string;
   updatedAt: string;
@@ -77,14 +75,6 @@ const adminFormSchema = z.object({
   sessionCost: z
     .number()
     .positive({ message: "Session cost must be positive" }),
-  lotLimit: z
-    .number()
-    .int()
-    .positive({ message: "Lot limit must be a positive integer" }),
-  queueLimit: z
-    .number()
-    .int()
-    .positive({ message: "Queue limit must be a positive integer" }),
 });
 
 export default function Admins() {
@@ -107,8 +97,6 @@ export default function Admins() {
       email: "",
       phoneNumber: "",
       sessionCost: 0,
-      lotLimit: 0,
-      queueLimit: 0,
     },
   });
 
@@ -172,8 +160,6 @@ export default function Admins() {
       email: admin.email,
       phoneNumber: admin.phoneNumber,
       sessionCost: admin.sessionCost,
-      lotLimit: admin.lotLimit,
-      queueLimit: admin.queueLimit,
     });
   };
 
@@ -471,44 +457,6 @@ export default function Admins() {
                           {...field}
                           onChange={(e) =>
                             field.onChange(parseFloat(e.target.value))
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lotLimit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lot Limit</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value))
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="queueLimit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Queue Limit</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value))
                           }
                         />
                       </FormControl>
