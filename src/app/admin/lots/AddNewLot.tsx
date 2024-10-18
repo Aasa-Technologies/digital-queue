@@ -25,6 +25,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import moment from "moment";
+import { getUserData } from "@/utils";
 
 // Validation schema
 const lotSchema = z.object({
@@ -33,8 +34,9 @@ const lotSchema = z.object({
 
 type LotFormValues = z.infer<typeof lotSchema>;
 
-const AddNewLots = ({ user, onLotAdded }: any) => {
+const AddNewLots = ({  onLotAdded }: any) => {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const form = useForm<LotFormValues>({
     resolver: zodResolver(lotSchema),
     defaultValues: {
@@ -42,7 +44,19 @@ const AddNewLots = ({ user, onLotAdded }: any) => {
     },
   });
 
+ useEffect(() => {
+  const userInfo = getUserData();
+  setUser(userInfo);
+ }, []);
+
   const handleSubmit = async (data: LotFormValues) => {
+    console.log({
+      name: data.name,
+        adminId: user?.id,
+        status: "active",
+        createdAt: moment().format(),
+        updatedAt: moment().format(),
+    });
     try {
       await addDoc(collection(db, "lots"), {
         name: data.name,

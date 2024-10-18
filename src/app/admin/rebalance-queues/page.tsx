@@ -107,7 +107,7 @@ const QueueMember = () => {
       const q = query(
         queueMembersRef,
         where("adminId", "==", user.id),
-        where("status", "in", ["waiting", "processing"])
+        where("status", "in", ["waiting", "processing","temporary_leave"])
       );
 
       return onSnapshot(
@@ -165,7 +165,7 @@ const QueueMember = () => {
     }
   };
 
-  const rebalanceQueues = async ( lotId: string) => {
+  const rebalanceQueues = async (lotId: string) => {
     try {
       console.log(`[DEBUG] Starting queue rebalancing for lot ${lotId} and admin ${user.id}`);
   
@@ -196,7 +196,7 @@ const QueueMember = () => {
         const queueMembersQuery = query(
           queueMembersRef,
           where("queueId", "==", queueId),
-          where("status", "in", ["waiting", "processing"])
+          where("status", "in", ["waiting", "processing","temporary_leave"])
         );
         const queueMembersSnapshot = await getDocs(queueMembersQuery);
         const queueLength = queueMembersSnapshot.size;
@@ -232,7 +232,7 @@ const QueueMember = () => {
       const sessionQuery = query(
         sessionsRef,
         where("adminId", "==", user.id),
-        where("createdAt", ">=", moment().startOf("day").toDate()),
+        where("createdAt", ">=", moment().startOf("day").format()),
         limit(1)
       );
       const sessionSnapshot = await getDocs(sessionQuery);
@@ -246,9 +246,8 @@ const QueueMember = () => {
       const avgWaitingTime = sessionData.avgWaitingTime || 10; // Default to 10 minutes if not set
   
       // Step 6: Rebalance queues
-      const batch = writeBatch(db);
-  
       for (const [queueId, queueLength] of queuesToRebalance) {
+        const batch = writeBatch(db);
         const membersToMove = queueLength - averageQueueLength;
         console.log(`[DEBUG] Queue ${queueId}: moving ${membersToMove} members`);
   
@@ -257,7 +256,7 @@ const QueueMember = () => {
         const membersToMoveQuery = query(
           queueMembersRef,
           where("queueId", "==", queueId),
-          where("status", "in", ["waiting"]),
+          where("status", "in", ["waiting","temporary_leave","processing"]),
           orderBy("position", "desc"),
           orderBy("joinTime", "desc")
         );
@@ -265,22 +264,21 @@ const QueueMember = () => {
   
         console.log(`[DEBUG] Found ${membersToMoveSnapshot.size} members to move from queue ${queueId}`);
   
-        // Get the last member in the shortest queue
-        const lastMemberQuery = query(
+        // Get all members in the shortest queue
+        const shortestQueueMembersQuery = query(
           queueMembersRef,
           where("queueId", "==", shortestQueue[0]),
-          where("status", "in", ["waiting", "processing"]),
-          orderBy("position", "desc"),
-          limit(1)
+          where("status", "in", ["waiting","temporary_leave","processing"]),
+          orderBy("position", "asc")
         );
-        const lastMemberSnapshot = await getDocs(lastMemberQuery);
-        let lastPersonEndTime = moment().toDate();
-        let newPosition = 1;
+        const shortestQueueMembersSnapshot = await getDocs(shortestQueueMembersQuery);
+        const shortestQueueMembers = shortestQueueMembersSnapshot.docs.map(doc => doc.data());
   
-        if (!lastMemberSnapshot.empty) {
-          const lastMember = lastMemberSnapshot.docs[0].data();
+        let lastPersonEndTime = moment().toDate();
+  
+        if (shortestQueueMembers.length > 0) {
+          const lastMember = shortestQueueMembers[shortestQueueMembers.length - 1];
           lastPersonEndTime = lastMember.endTime.toDate();
-          newPosition = lastMember.position + 1;
         }
   
         // Move members to the shortest queue
@@ -294,6 +292,15 @@ const QueueMember = () => {
           const endTime = moment(lastPersonEndTime).add(avgWaitingTime, "minutes").toDate();
           const waitingTime = moment(endTime).diff(moment(), "minutes");
   
+          // Fetch the current number of members in the shortest queue
+          const currentMembersQuery = query(
+            queueMembersRef,
+            where("queueId", "==", shortestQueue[0]),
+            where("status", "in", ["waiting", "temporary_leave", "processing"])
+          );
+          const currentMembersSnapshot = await getDocs(currentMembersQuery);
+          const newPosition = currentMembersSnapshot.size + 1;
+  
           // Update member's queue, position, and time-related fields
           batch.update(memberDoc.ref, {
             queueId: shortestQueue[0],
@@ -305,14 +312,13 @@ const QueueMember = () => {
           });
   
           lastPersonEndTime = endTime;
-          newPosition++;
         }
   
         // Update positions of remaining members in the original queue
         const remainingMembersQuery = query(
           queueMembersRef,
           where("queueId", "==", queueId),
-          where("status", "in", ["waiting", "processing"]),
+          where("status", "in", ["waiting","temporary_leave","processing"]),
           orderBy("position", "asc")
         );
         const remainingMembersSnapshot = await getDocs(remainingMembersQuery);
@@ -336,17 +342,59 @@ const QueueMember = () => {
   
           lastEndTime = endTime;
         });
+
+        // Commit the batch for this queue
+        await batch.commit();
+        console.log(`[DEBUG] Batch committed for queue ${queueId}`);
       }
   
-      // Commit the batch
-      await batch.commit();
+      // Recalculate positions and times for all queues
+      for (const queueDoc of queueSnapshot.docs) {
+        const queueId = queueDoc.id;
+        const batch = writeBatch(db);
+        const queueMembersRef = collection(db, "queue_members");
+        const queueMembersQuery = query(
+          queueMembersRef,
+          where("queueId", "==", queueId),
+          where("status", "in", ["waiting","temporary_leave","processing"]),
+          orderBy("position", "asc")
+        );
+        const queueMembersSnapshot = await getDocs(queueMembersQuery);
   
-      console.log("[DEBUG] Batch committed. Queues rebalanced successfully");
+        let lastEndTime = moment().toDate();
+        queueMembersSnapshot.docs.forEach((doc, index) => {
+          const memberData = doc.data();
+          console.log(`[DEBUG] Recalculating for member ${memberData.userId} in queue ${queueId}`);
+          
+          const endTime = moment(lastEndTime).add(avgWaitingTime, "minutes").toDate();
+          const waitingTime = moment(endTime).diff(moment(), "minutes");
+          console.log({
+            position: index + 1,
+            endTime: endTime,
+            waitingTime: waitingTime,
+            updatedAt: serverTimestamp()
+          });
+  
+          batch.update(doc.ref, {
+            position: index + 1,
+            endTime: endTime,
+            waitingTime: waitingTime,
+            updatedAt: serverTimestamp()
+          });
+  
+          lastEndTime = endTime;
+        });
+
+        // Commit the batch for this queue
+        await batch.commit();
+        console.log(`[DEBUG] Batch committed for queue ${queueId} after recalculation`);
+      }
+  
+      console.log("[DEBUG] All queues rebalanced successfully");
     } catch (error) {
       console.error("[DEBUG] Error rebalancing queues:", error);
     }
   };
-  
 
 const handleRebalance = async () => {
   lots.forEach(async (lot) => {

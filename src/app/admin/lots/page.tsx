@@ -98,7 +98,7 @@ export default function Lots() {
 
     fetchLots();
     fetchUserData();
-  }, [user.id]);
+  }, [user?.id]);
 
   const fetchLots = async () => {
     setIsLoading(true);
@@ -216,7 +216,7 @@ export default function Lots() {
     <div className="p-5 space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="font-extrabold text-2xl">Lots</h1>
-        <AddNewLot user={user} onLotAdded={fetchLots} />
+        <AddNewLot onLotAdded={fetchLots} />
       </div>
       <div className="flex justify-between items-center">
         <Input
