@@ -59,7 +59,9 @@ const Session = () => {
           (session) => new Date(session.startTime).toDateString() === today
         );
         setTodaySession(todaySessionData || null);
-        setSessionData(sessions.filter((session) => session.id !== todaySessionData?.id));
+        setSessionData(
+          sessions.filter((session) => session.id !== todaySessionData?.id)
+        );
       } catch (error: any) {
         console.error("Error fetching sessions: ", error);
         toast.error("Failed to fetch sessions.");
@@ -70,7 +72,7 @@ const Session = () => {
 
     fetchUserData();
     fetchSessionData();
-  }, [user.id]);
+  }, [user?.id]);
 
   return (
     <div>
@@ -78,7 +80,7 @@ const Session = () => {
         <h1 className="text-2xl font-bold">Sessions</h1>
         <AddNewSessionModel user={user} />
       </div>
-      
+
       {loading ? (
         <p>Loading...</p>
       ) : (
@@ -91,10 +93,12 @@ const Session = () => {
                   <strong>Name:</strong> {todaySession.name}
                 </div>
                 <div>
-                  <strong>Start Time:</strong> {new Date(todaySession.startTime).toLocaleString()}
+                  <strong>Start Time:</strong>{" "}
+                  {new Date(todaySession.startTime).toLocaleString()}
                 </div>
                 <div>
-                  <strong>Average Waiting Time:</strong> {todaySession.avgWaitingTime} minutes
+                  <strong>Average Waiting Time:</strong>{" "}
+                  {todaySession.avgWaitingTime} minutes
                 </div>
                 <div>
                   <strong>Status:</strong> {todaySession.status}
@@ -123,7 +127,9 @@ const Session = () => {
                   {sessionData.map((session) => (
                     <TableRow key={session.id}>
                       <TableCell>{session.name}</TableCell>
-                      <TableCell>{new Date(session.startTime).toLocaleString()}</TableCell>
+                      <TableCell>
+                        {new Date(session.startTime).toLocaleString()}
+                      </TableCell>
                       <TableCell>{session.avgWaitingTime} minutes</TableCell>
                       <TableCell>{session.status}</TableCell>
                     </TableRow>

@@ -343,7 +343,7 @@ const QueueMember = () => {
         <div className="">
           <div className="flex justify-between">
             <h1 className="font-semibold text-xl mb-3">
-              Lots, Queues, and Members
+              Rebalance Queue
             </h1>
           </div>
         </div>
