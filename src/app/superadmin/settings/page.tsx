@@ -125,7 +125,7 @@ const SuperAdminSettings = () => {
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="m-6 p-4">
       <h1 className="text-2xl font-bold mb-6">Super Admin Settings</h1>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

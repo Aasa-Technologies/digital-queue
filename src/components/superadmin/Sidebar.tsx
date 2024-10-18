@@ -10,7 +10,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="border-r border-gray-500">
+    <div className="border-r border-gray-200">
       <div className="h-screen bg-white dark:bg-slate-900">
         <aside
           id="sidebar"
