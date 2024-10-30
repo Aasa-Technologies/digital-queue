@@ -10,11 +10,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { getUserData } from "@/utils";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -36,8 +35,15 @@ import {
 } from "@/components/ui/select";
 import moment from "moment";
 
+// Updated schema to prevent only spaces in the queue name
 const queueSchema = z.object({
-  name: z.string().min(1, "Queue name is required"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Queue name is required")
+    .refine((value) => value.length > 0, {
+      message: "Queue name cannot be empty or just spaces",
+    }),
   status: z.enum(["active", "inactive"]),
 });
 

@@ -33,16 +33,25 @@ import {
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 
+// Updated schema
 const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "Name must be at least 2 characters.",
-  }),
+  name: z
+    .string()
+    .trim()
+    .min(2, { message: "Name must be at least 2 characters." })
+    .refine((value) => value.trim().length > 0, {
+      message: "Name cannot consist of only spaces.",
+    }),
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
-  phone: z.string().min(10, {
-    message: "Phone number must be at least 10 digits.",
-  }),
+  phone: z
+    .string()
+    .min(10, { message: "Phone number must be exactly 10 digits." })
+    .max(10, { message: "Phone number must be exactly 10 digits." })
+    .refine((value) => /^\d+$/.test(value), {
+      message: "Phone number must only contain digits.",
+    }),
   password: z.string().min(6, {
     message: "Password must be at least 6 characters.",
   }),

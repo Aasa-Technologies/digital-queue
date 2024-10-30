@@ -35,10 +35,16 @@ import * as z from "zod";
 
 // Validation schema
 const sessionSchema = z.object({
-  name: z.string().min(1, { message: "Name is required" }),
-  avgWaitingTime: z
+  name: z
     .string()
-    .min(1, { message: "Average waiting time must be at least 1" }),
+    .trim()
+    .min(1, { message: "Name is required" })
+    .refine((value) => value.trim().length > 0, {
+      message: "Name cannot be empty or just spaces",
+    }),
+  avgWaitingTime: z.coerce
+    .number()
+    .min(1, { message: "Average waiting time must be at least 1 minute" }),
 });
 
 type SessionFormValues = z.infer<typeof sessionSchema>;
@@ -51,16 +57,15 @@ const AddNewSessionModel = ({ user }: any) => {
     resolver: zodResolver(sessionSchema),
     defaultValues: {
       name: "",
-      avgWaitingTime: "",
+      avgWaitingTime: 1,
     },
   });
 
-  // Check for any sessions created today
   const checkSessionToday = async () => {
     if (!user?.id) return;
     const sessionsRef = collection(db, "sessions");
-    const today = moment().startOf('day');
-    const tomorrow = moment(today).add(1, 'days');
+    const today = moment().startOf("day");
+    const tomorrow = moment(today).add(1, "days");
     const sessionTodayQuery = query(
       sessionsRef,
       where("adminId", "==", user?.id),
