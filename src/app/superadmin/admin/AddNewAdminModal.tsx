@@ -31,14 +31,13 @@ import moment from "moment";
 
 const adminFormSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
-  phoneNumber: z
-    .string()
-    .regex(/^\+?[1-9]\d{1,14}$/, { message: "Invalid phone number" }),
+  phoneNumber: z.string().regex(/^\+?[1-9]\d{9}$/, {
+    message: "Phone number must be 10 digits without spaces",
+  }),
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   sessionCost: z
     .number()
     .positive({ message: "Session cost must be positive" }),
-  
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
@@ -145,7 +144,11 @@ export default function AddNewAdmin({
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="+1234567890" {...field} />
+                        <Input
+                          placeholder="Phone Number"
+                          maxLength={10} // Limit input to 10 characters
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -174,17 +177,19 @@ export default function AddNewAdmin({
                         <Input
                           type="number"
                           step="0.01"
+                          min="0.01" // Set minimum value to ensure positive cost
                           {...field}
-                          onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value))
-                          }
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            field.onChange(value > 0 ? value : ""); // Ensures non-zero cost
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-             
+
                 <FormField
                   control={form.control}
                   name="password"

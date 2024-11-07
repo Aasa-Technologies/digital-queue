@@ -220,6 +220,16 @@ const Reports = () => {
     <Card className="p-6 m-6">
       <h1 className="text-2xl font-bold mb-4">Queue Member Reports</h1>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+        <Select onValueChange={setSelectedAdmin} value={selectedAdmin}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select Admin" />
+          </SelectTrigger>
+          <SelectContent>
+            {admins.map(admin => (
+              <SelectItem key={admin.id} value={admin.id}>{admin.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select onValueChange={setSelectedLot} value={selectedLot}>
           <SelectTrigger>
             <SelectValue placeholder="Select Lot" />
@@ -240,17 +250,7 @@ const Reports = () => {
             ))}
           </SelectContent>
         </Select>
-        <Select onValueChange={setSelectedAdmin} value={selectedAdmin}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select Admin" />
-          </SelectTrigger>
-          <SelectContent>
-            {admins.map(admin => (
-              <SelectItem key={admin.id} value={admin.id}>{admin.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Popover>
+         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline">
               {startDate ? format(startDate, 'PPP') : 'Pick start date'}
@@ -260,11 +260,16 @@ const Reports = () => {
             <Calendar
               mode="single"
               selected={startDate}
-              onSelect={setStartDate}
+              onSelect={(date) => {
+                setStartDate(date);
+                setEndDate(undefined); // Reset end date if start date changes
+              }}
               initialFocus
             />
           </PopoverContent>
         </Popover>
+
+        {/* End Date Picker */}
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline">
@@ -276,6 +281,7 @@ const Reports = () => {
               mode="single"
               selected={endDate}
               onSelect={setEndDate}
+              disabled={(date) => startDate && date < startDate} // Disable dates before start date
               initialFocus
             />
           </PopoverContent>
