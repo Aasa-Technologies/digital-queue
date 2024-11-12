@@ -45,12 +45,15 @@ const sessionSchema = z.object({
   avgWaitingTime: z.coerce
     .number()
     .min(1, { message: "Average waiting time must be at least 1 minute" }),
+  maxMembers: z.coerce
+    .number()
+    .min(1, { message: "Minimum 1 member is required" }),
 });
 
 type SessionFormValues = z.infer<typeof sessionSchema>;
 
-const AddNewSessionModel = ({ user }: any) => {
-  const [hasSessionToday, setHasSessionToday] = useState(false);
+const AddNewSessionModel = ({ user, maxSessionsPerDay = 1 }: any) => {
+  const [sessionsToday, setSessionsToday] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const form = useForm<SessionFormValues>({
@@ -58,6 +61,7 @@ const AddNewSessionModel = ({ user }: any) => {
     defaultValues: {
       name: "",
       avgWaitingTime: 1,
+      maxMembers: 1,
     },
   });
 
@@ -74,7 +78,7 @@ const AddNewSessionModel = ({ user }: any) => {
     );
 
     const querySnapshot = await getDocs(sessionTodayQuery);
-    setHasSessionToday(!querySnapshot.empty);
+    setSessionsToday(querySnapshot.size);
   };
 
   useEffect(() => {
@@ -82,9 +86,9 @@ const AddNewSessionModel = ({ user }: any) => {
   }, [user]);
 
   const onSubmit = async (data: SessionFormValues) => {
-    if (hasSessionToday) {
+    if (sessionsToday >= maxSessionsPerDay) {
       toast.error(
-        "You have already created a session today. Only one session per day is allowed."
+        `The daily session limit of ${maxSessionsPerDay} has been reached.`
       );
       return;
     }
@@ -119,9 +123,9 @@ const AddNewSessionModel = ({ user }: any) => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add New Session</DialogTitle>
-          {hasSessionToday && (
+          {sessionsToday >= maxSessionsPerDay && (
             <p className="text-red-500">
-              You have already created a session today. Only one session per day is allowed.
+              The daily session limit of {maxSessionsPerDay} has been reached.
             </p>
           )}
         </DialogHeader>
@@ -163,8 +167,26 @@ const AddNewSessionModel = ({ user }: any) => {
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="maxMembers"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Maximum Members</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="Set the maximum number of members"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div>
-              <Button type="submit" disabled={hasSessionToday}>
+              <Button type="submit" disabled={sessionsToday >= maxSessionsPerDay}>
                 Add Session
               </Button>
             </div>

@@ -32,6 +32,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 
 // Updated schema
 const formSchema = z.object({
@@ -52,9 +53,11 @@ const formSchema = z.object({
     .refine((value) => /^\d+$/.test(value), {
       message: "Phone number must only contain digits.",
     }),
-  password: z.string().min(6, {
-    message: "Password must be at least 6 characters.",
-  }),
+  password: z.string()
+    .min(8, { message: "Password must be at least 8 characters." })
+    .regex(/[A-Z]/, { message: "Password must include an uppercase letter." })
+    .regex(/[0-9]/, { message: "Password must include a number." })
+    .regex(/[^A-Za-z0-9]/, { message: "Password must include a special character." }),
   lotId: z.string().min(1, {
     message: "Please select a lot.",
   }),
@@ -64,6 +67,7 @@ const formSchema = z.object({
 });
 
 const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
+  const [showPassword, setShowPassword] = useState(false);
   const [lots, setLots] = useState<any[]>([]);
   const [queues, setQueues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -230,19 +234,32 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+               <FormField
+      control={form.control}
+      name="password"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Password</FormLabel>
+          <FormControl>
+            <div className="relative">
+              <Input type={showPassword ? "text" : "password"} {...field} />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <AiOutlineEyeInvisible size={20} />
+                ) : (
+                  <AiOutlineEye size={20} />
                 )}
-              />
+              </button>
+            </div>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
             </div>
             <FormField
               control={form.control}

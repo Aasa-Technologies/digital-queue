@@ -22,13 +22,19 @@ const profileSchema = z.object({
 });
 
 const passwordSchema = z.object({
-  currentPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  newPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  currentPassword: z.string().min(8, { message: 'Password must be at least 8 characters' }),
+  newPassword: z.string()
+    .min(8, { message: 'Password must be at least 8 characters' })
+    .regex(/[A-Z]/, { message: 'Password must include at least one uppercase letter' })
+    .regex(/[a-z]/, { message: 'Password must include at least one lowercase letter' })
+    .regex(/[0-9]/, { message: 'Password must include at least one number' })
+    .regex(/[^A-Za-z0-9]/, { message: 'Password must include at least one special character' }),
+  confirmPassword: z.string().min(8, { message: 'Password must be at least 8 characters' }),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
+
 
 const SuperAdminSettings = () => {
   const router = useRouter();

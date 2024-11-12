@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { db } from "@/utils/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore";
 import { getUserData } from "@/utils";
 import AddNewSessionModel from "./AddNewSessionModel";
 import {
@@ -44,10 +44,7 @@ const Session = () => {
           return;
         }
         const sessionsRef = collection(db, "sessions");
-        const sessionQuery = query(
-          sessionsRef,
-          where("adminId", "==", user.id)
-        );
+        const sessionQuery = query(sessionsRef, where("adminId", "==", user.id));
         const querySnapshot = await getDocs(sessionQuery);
         const sessions: SessionData[] = querySnapshot.docs.map((doc) => ({
           id: doc.id,
@@ -73,6 +70,24 @@ const Session = () => {
     fetchUserData();
     fetchSessionData();
   }, [user?.id]);
+
+  // Function to deactivate a session
+  const deactivateSession = async (sessionId: string) => {
+    try {
+      const sessionRef = doc(db, "sessions", sessionId);
+      await updateDoc(sessionRef, { status: "deactivated" });
+      toast.success("Session deactivated successfully");
+      // Refresh session data after deactivation
+      setSessionData((prevData) =>
+        prevData.map((session) =>
+          session.id === sessionId ? { ...session, status: "deactivated" } : session
+        )
+      );
+    } catch (error) {
+      console.error("Error deactivating session:", error);
+      toast.error("Failed to deactivate session.");
+    }
+  };
 
   return (
     <div>
@@ -120,7 +135,7 @@ const Session = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Average Waiting Time</TableHead>
                     <TableHead>Created At</TableHead>
-                
+                    <TableHead>Actions</TableHead> {/* New column for actions */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -131,7 +146,18 @@ const Session = () => {
                       <TableCell>
                         {new Date(session.startTime).toLocaleString()}
                       </TableCell>
-               
+                      <TableCell>
+                        {session.status !== "deactivated" ? (
+                          <button
+                            onClick={() => deactivateSession(session.id)}
+                            className="text-red-500"
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          "Deactivated"
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

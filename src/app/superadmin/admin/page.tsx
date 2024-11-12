@@ -71,7 +71,7 @@ const adminFormSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
   phoneNumber: z
     .string()
-    .regex(/^\+?[1-9]\d{1,14}$/, { message: "Invalid phone number" }),
+    .regex(/^\d{10}$/, { message: "Phone number must be exactly 10 digits" }),
   sessionCost: z
     .number()
     .positive({ message: "Session cost must be positive" }),
@@ -438,7 +438,7 @@ export default function Admins() {
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input {...field} maxLength={10} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

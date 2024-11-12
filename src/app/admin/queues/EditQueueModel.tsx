@@ -54,11 +54,8 @@ const UpdateQueueNameModel = ({
         setOpen(false);
       }
     } catch (error: any) {
-      if (error.response) {
-        toast.error(error.response.data.error);
-      } else {
-        toast.error("An error occurred. Please try again later.");
-      }
+      const errorMessage = error.response?.data?.error || "An unknown error occurred. Please try again.";
+      toast.error(errorMessage);
     }
   };
 
@@ -81,7 +78,7 @@ const UpdateQueueNameModel = ({
             required
           />
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-4">
             <Button onClick={handleSubmit}>Update Name</Button>
             <DialogClose className={buttonVariants()}>Close</DialogClose>
           </div>
