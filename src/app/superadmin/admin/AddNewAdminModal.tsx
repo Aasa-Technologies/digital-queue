@@ -12,12 +12,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,14 +29,11 @@ import moment from "moment";
 
 const adminFormSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
-  phoneNumber: z
-    .string()
-    .regex(/^\+?[1-9]\d{1,14}$/, { message: "Invalid phone number" }),
+  phoneNumber: z.string().regex(/^\+?[1-9]\d{9}$/, {
+    message: "Phone number must be 10 digits without spaces",
+  }),
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  sessionCost: z
-    .number()
-    .positive({ message: "Session cost must be positive" }),
-  
+  sessionCost: z.number().positive({ message: "Session cost must be positive" }),
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
@@ -59,6 +54,7 @@ export default function AddNewAdmin({
   onAdminAdded: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<AdminFormValues>({
     resolver: zodResolver(adminFormSchema),
@@ -67,11 +63,12 @@ export default function AddNewAdmin({
       phoneNumber: "",
       name: "",
       sessionCost: 0,
-      password: "", // Initialize password field
+      password: "",
     },
   });
 
   async function onSubmit(data: AdminFormValues) {
+    setLoading(true); // Start loading
     try {
       // Check if an admin with the same email already exists
       const adminsRef = collection(db, "admins");
@@ -80,6 +77,7 @@ export default function AddNewAdmin({
 
       if (!querySnapshot.empty) {
         toast.error("Admin with this email already exists");
+        setLoading(false);
         return;
       }
 
@@ -89,10 +87,11 @@ export default function AddNewAdmin({
 
       if (!querySnapshot2.empty) {
         toast.error("Admin with this phone number already exists");
+        setLoading(false);
         return;
       }
 
-      // If no duplicate, add the new admin with moment for timestamps
+      // If no duplicate, add the new admin
       await addDoc(adminsRef, {
         ...data,
         status: "active",
@@ -108,6 +107,8 @@ export default function AddNewAdmin({
     } catch (error) {
       toast.error("Failed to add admin");
       console.error("Error adding admin:", error);
+    } finally {
+      setLoading(false); // Stop loading when done
     }
   }
 
@@ -145,7 +146,11 @@ export default function AddNewAdmin({
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="+1234567890" {...field} />
+                        <Input
+                          placeholder="Phone Number"
+                          maxLength={10}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -174,17 +179,18 @@ export default function AddNewAdmin({
                         <Input
                           type="number"
                           step="0.01"
+                          min="0.01"
                           {...field}
-                          onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value))
-                          }
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            field.onChange(value > 0 ? value : "");
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-             
                 <FormField
                   control={form.control}
                   name="password"
@@ -204,7 +210,9 @@ export default function AddNewAdmin({
                 />
               </div>
               <DialogFooter>
-                <Button type="submit">Save</Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Saving..." : "Save"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>

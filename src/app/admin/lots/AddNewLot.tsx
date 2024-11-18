@@ -16,25 +16,29 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"; // Adjust these imports based on your actual path
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { addDoc, collection } from "firebase/firestore";
-import { db } from "@/utils/firebase"; // Adjust the path as necessary
+import { db } from "@/utils/firebase";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import moment from "moment";
 import { getUserData } from "@/utils";
 
-// Validation schema
+// Updated Validation schema
 const lotSchema = z.object({
-  name: z.string().min(1, { message: "Lot name is required" }),
+  name: z
+    .string()
+    .trim() // Trim spaces from input
+    .min(1, { message: "Lot name is required" }) // Ensure it's not empty
+    .refine((value) => value.length > 0, { message: "Name cannot be empty or just spaces" }),
 });
 
 type LotFormValues = z.infer<typeof lotSchema>;
 
-const AddNewLots = ({  onLotAdded }: any) => {
+const AddNewLots = ({ onLotAdded }: any) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const form = useForm<LotFormValues>({
@@ -44,18 +48,18 @@ const AddNewLots = ({  onLotAdded }: any) => {
     },
   });
 
- useEffect(() => {
-  const userInfo = getUserData();
-  setUser(userInfo);
- }, []);
+  useEffect(() => {
+    const userInfo = getUserData();
+    setUser(userInfo);
+  }, []);
 
   const handleSubmit = async (data: LotFormValues) => {
     console.log({
       name: data.name,
-        adminId: user?.id,
-        status: "active",
-        createdAt: moment().format(),
-        updatedAt: moment().format(),
+      adminId: user?.id,
+      status: "active",
+      createdAt: moment().format(),
+      updatedAt: moment().format(),
     });
     try {
       await addDoc(collection(db, "lots"), {
@@ -85,7 +89,7 @@ const AddNewLots = ({  onLotAdded }: any) => {
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Lots</DialogTitle>
+            <DialogTitle>Add New Lot</DialogTitle>
           </DialogHeader>
 
           <Form {...form}>

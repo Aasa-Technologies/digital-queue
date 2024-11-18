@@ -1,5 +1,5 @@
-'use client'
-import React from 'react';
+'use client';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/utils/firebase';
@@ -10,14 +10,10 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+// Import icons
+import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -26,6 +22,10 @@ const formSchema = z.object({
 
 const SuperAdminLogin = () => {
   const router = useRouter();
+
+  // State to manage password visibility
+  const [showPassword, setShowPassword] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -46,7 +46,7 @@ const SuperAdminLogin = () => {
       }
 
       const superAdminDoc = querySnapshot.docs[0];
-      const superAdminData:any = { ...superAdminDoc.data(), id: superAdminDoc.id };
+      const superAdminData: any = { ...superAdminDoc.data(), id: superAdminDoc.id };
 
       if (superAdminData.password !== values.password) {
         toast.error('Invalid password');
@@ -55,9 +55,7 @@ const SuperAdminLogin = () => {
 
       // Login successful
       toast.success('Login successful');
-      // Store super admin data in localStorage or state management solution
       localStorage.setItem('superAdminData', JSON.stringify(superAdminData));
-      // Redirect to super admin dashboard
       router.push('/superadmin/');
     } catch (error) {
       console.error('Login error:', error);
@@ -80,7 +78,7 @@ const SuperAdminLogin = () => {
                   <FormControl>
                     <Input type="email" {...field} />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage>{form.formState.errors.email?.message}</FormMessage>
                 </FormItem>
               )}
             />
@@ -91,9 +89,25 @@ const SuperAdminLogin = () => {
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        {...field}
+                      />
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <AiOutlineEyeInvisible size={20} />
+                        ) : (
+                          <AiOutlineEye size={20} />
+                        )}
+                      </button>
+                    </div>
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage>{form.formState.errors.password?.message}</FormMessage>
                 </FormItem>
               )}
             />

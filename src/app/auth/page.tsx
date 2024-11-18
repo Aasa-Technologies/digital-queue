@@ -8,8 +8,6 @@ import * as z from "zod";
 import { toast } from "sonner";
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
   query,
   where,
@@ -34,10 +32,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Eye, EyeOff } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(2, { message: "Password is required" }),
+  password: z.string().min(2, { message: "Password must be at least 2 characters" }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -45,6 +44,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -57,12 +57,8 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      // Reference to the admin collection
       const adminsRef = collection(db, "admins");
-
-      // Create a query to check if the email exists in the admin collection
       const emailQuery = query(adminsRef, where("email", "==", data.email));
-
       const emailSnapshot = await getDocs(emailQuery);
 
       if (!emailSnapshot.empty) {
@@ -70,9 +66,10 @@ export default function LoginPage() {
         const userData = userDoc.data();
 
         if (userData.status === "inactive") {
-          toast.error("Your account is inactive. Please contact the administrator.");
+          toast.error(
+            "Your account is inactive. Please contact the administrator."
+          );
         } else if (data.password === userData.password) {
-          // Store user data in local storage
           localStorage.setItem(
             "userData",
             JSON.stringify({
@@ -81,8 +78,6 @@ export default function LoginPage() {
             })
           );
           toast.success("Login successful!");
-
-          // Redirect to the admin dashboard
           router.push("/admin/");
         } else {
           toast.error("Incorrect password.");
@@ -109,6 +104,7 @@ export default function LoginPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-4">
+              {/* Email Field */}
               <FormField
                 control={form.control}
                 name="email"
@@ -118,10 +114,12 @@ export default function LoginPage() {
                     <FormControl>
                       <Input placeholder="Enter your email" {...field} />
                     </FormControl>
-                    <FormMessage />
+                    {/* Displaying validation error message for email */}
+                    <FormMessage>{form.formState.errors.email?.message}</FormMessage>
                   </FormItem>
                 )}
               />
+              {/* Password Field */}
               <FormField
                 control={form.control}
                 name="password"
@@ -129,13 +127,27 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your password"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-5 w-5" />
+                          ) : (
+                            <Eye className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
-                    <FormMessage />
+                    {/* Displaying validation error message for password */}
+                    <FormMessage>{form.formState.errors.password?.message}</FormMessage>
                   </FormItem>
                 )}
               />

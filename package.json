@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "build": "NODE_ENV=production next build",
+    "start": "NODE_ENV=production next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@heroicons/react": "^2.1.5",
     "@hookform/resolvers": "^3.3.4",
     "@nextui-org/react": "^2.2.10",
     "@radix-ui/react-accordion": "^1.1.2",
@@ -57,6 +58,8 @@
     "react-day-picker": "^8.10.0",
     "react-dom": "^18",
     "react-hook-form": "^7.51.2",
+    "react-icons": "^5.3.0",
+    "react-razorpay": "^3.0.1",
     "react-resizable-panels": "^2.0.16",
     "recharts": "^2.13.0",
     "sonner": "^1.4.41",

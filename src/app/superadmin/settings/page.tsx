@@ -10,32 +10,40 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
 
 const profileSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-  email: z.string().email({ message: 'Invalid email address' }),
+  name: z.string()
+    .trim()
+    .min(2, { message: 'Name must be at least 2 characters' }),
+  email: z.string()
+    .email({ message: 'Invalid email address' }),
 });
 
 const passwordSchema = z.object({
-  currentPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  newPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  currentPassword: z.string().min(8, { message: 'Password must be at least 8 characters' }),
+  newPassword: z.string()
+    .min(8, { message: 'Password must be at least 8 characters' })
+    .regex(/[A-Z]/, { message: 'Password must include at least one uppercase letter' })
+    .regex(/[a-z]/, { message: 'Password must include at least one lowercase letter' })
+    .regex(/[0-9]/, { message: 'Password must include at least one number' })
+    .regex(/[^A-Za-z0-9]/, { message: 'Password must include at least one special character' }),
+  confirmPassword: z.string().min(8, { message: 'Password must be at least 8 characters' }),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
+
 const SuperAdminSettings = () => {
   const router = useRouter();
   const [superAdminData, setSuperAdminData] = useState<any>(null);
+
+  // State for password visibility toggles
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const profileForm = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -181,7 +189,16 @@ const SuperAdminSettings = () => {
                     <FormItem>
                       <FormLabel>Current Password</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} />
+                        <div className="relative">
+                          <Input type={showCurrentPassword ? 'text' : 'password'} {...field} />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          >
+                            {showCurrentPassword ? <AiOutlineEyeInvisible size={20} /> : <AiOutlineEye size={20} />}
+                          </button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -194,7 +211,16 @@ const SuperAdminSettings = () => {
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} />
+                        <div className="relative">
+                          <Input type={showNewPassword ? 'text' : 'password'} {...field} />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                          >
+                            {showNewPassword ? <AiOutlineEyeInvisible size={20} /> : <AiOutlineEye size={20} />}
+                          </button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -207,7 +233,16 @@ const SuperAdminSettings = () => {
                     <FormItem>
                       <FormLabel>Confirm New Password</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} />
+                        <div className="relative">
+                          <Input type={showConfirmPassword ? 'text' : 'password'} {...field} />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          >
+                            {showConfirmPassword ? <AiOutlineEyeInvisible size={20} /> : <AiOutlineEye size={20} />}
+                          </button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

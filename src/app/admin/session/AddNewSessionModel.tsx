@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import moment from "moment";
 import {
@@ -21,13 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import {
-  addDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { addDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,32 +28,41 @@ import * as z from "zod";
 
 // Validation schema
 const sessionSchema = z.object({
-  name: z.string().min(1, { message: "Name is required" }),
-  avgWaitingTime: z
+  name: z
     .string()
-    .min(1, { message: "Average waiting time must be at least 1" }),
+    .trim()
+    .min(1, { message: "Name is required" })
+    .refine((value) => value.trim().length > 0, {
+      message: "Name cannot be empty or just spaces",
+    }),
+  avgWaitingTime: z.coerce
+    .number()
+    .min(1, { message: "Average waiting time must be at least 1 minute" }),
+  maxMembers: z.coerce
+    .number()
+    .min(1, { message: "Minimum 1 member is required" }),
 });
 
 type SessionFormValues = z.infer<typeof sessionSchema>;
 
-const AddNewSessionModel = ({ user }: any) => {
-  const [hasSessionToday, setHasSessionToday] = useState(false);
+const AddNewSessionModel = ({ user, maxSessionsPerDay = 1 }: any) => {
+  const [sessionsToday, setSessionsToday] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema),
     defaultValues: {
       name: "",
-      avgWaitingTime: "",
+      avgWaitingTime: 1,
+      maxMembers: 1,
     },
   });
 
-  // Check for any sessions created today
   const checkSessionToday = async () => {
     if (!user?.id) return;
     const sessionsRef = collection(db, "sessions");
-    const today = moment().startOf('day');
-    const tomorrow = moment(today).add(1, 'days');
+    const today = moment().startOf("day");
+    const tomorrow = moment(today).add(1, "days");
     const sessionTodayQuery = query(
       sessionsRef,
       where("adminId", "==", user?.id),
@@ -69,7 +71,7 @@ const AddNewSessionModel = ({ user }: any) => {
     );
 
     const querySnapshot = await getDocs(sessionTodayQuery);
-    setHasSessionToday(!querySnapshot.empty);
+    setSessionsToday(querySnapshot.size);
   };
 
   useEffect(() => {
@@ -77,9 +79,9 @@ const AddNewSessionModel = ({ user }: any) => {
   }, [user]);
 
   const onSubmit = async (data: SessionFormValues) => {
-    if (hasSessionToday) {
+    if (sessionsToday >= maxSessionsPerDay) {
       toast.error(
-        "You have already created a session today. Only one session per day is allowed."
+        `The daily session limit of ${maxSessionsPerDay} has been reached.`
       );
       return;
     }
@@ -114,9 +116,9 @@ const AddNewSessionModel = ({ user }: any) => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add New Session</DialogTitle>
-          {hasSessionToday && (
+          {sessionsToday >= maxSessionsPerDay && (
             <p className="text-red-500">
-              You have already created a session today. Only one session per day is allowed.
+              The daily session limit of {maxSessionsPerDay} has been reached.
             </p>
           )}
         </DialogHeader>
@@ -158,8 +160,29 @@ const AddNewSessionModel = ({ user }: any) => {
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="maxMembers"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Maximum Members</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="Set the maximum number of members"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div>
-              <Button type="submit" disabled={hasSessionToday}>
+              <Button
+                type="submit"
+                disabled={sessionsToday >= maxSessionsPerDay}
+              >
                 Add Session
               </Button>
             </div>

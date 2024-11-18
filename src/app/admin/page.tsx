@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   collection,
   getDocs,
@@ -88,6 +88,8 @@ const AdminHome = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lots, setLots] = useState<Lot[]>([]);
   const [queues, setQueues] = useState<Queue[]>([]);
+  const qrRef = useRef<HTMLDivElement>(null); // Reference for QR code
+
 
   useEffect(() => {
     const userData = getUserData();
@@ -125,6 +127,30 @@ const AdminHome = () => {
       toast.error('Failed to fetch queues');
     }
   };
+
+  const downloadQRCode = () => {
+    if (qrRef.current) {
+      const svg = qrRef.current.querySelector("svg");
+      if (svg) {
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx?.drawImage(img, 0, 0);
+          const pngFile = canvas.toDataURL("image/png");
+          const downloadLink = document.createElement("a");
+          downloadLink.href = pngFile;
+          downloadLink.download = "QRCode.png";
+          downloadLink.click();
+        };
+        img.src = "data:image/svg+xml;base64," + btoa(svgData);
+      }
+    }
+  };
+  
 
   useEffect(() => {
     const fetchData = async () => {
@@ -240,9 +266,19 @@ const AdminHome = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
-        <QRCodeSVG value={user?.id || ''} size={100} />
-      </div>
+  <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
+  <div ref={qrRef}>
+  <button
+    onClick={downloadQRCode}
+    className="text-black px-2 py-2 rounded mb-3 mr-4 border border-zinc-800"
+  >
+    Download QR Code
+  </button>
+  <div className="flex justify-center">
+    <QRCodeSVG value={user?.id || ""} size={100}/>
+    </div>
+  </div>
+</div>
       <div className="mb-6">
         <Select onValueChange={(value) => {
           setTimeRange(value);
