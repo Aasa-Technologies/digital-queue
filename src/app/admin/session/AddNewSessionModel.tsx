@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import moment from "moment";
 import {
@@ -21,13 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import {
-  addDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { addDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -186,7 +179,10 @@ const AddNewSessionModel = ({ user, maxSessionsPerDay = 1 }: any) => {
             />
 
             <div>
-              <Button type="submit" disabled={sessionsToday >= maxSessionsPerDay}>
+              <Button
+                type="submit"
+                disabled={sessionsToday >= maxSessionsPerDay}
+              >
                 Add Session
               </Button>
             </div>

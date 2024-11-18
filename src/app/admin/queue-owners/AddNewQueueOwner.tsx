@@ -18,7 +18,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getUserData } from "@/utils";
-import { collection, query, where, getDocs, addDoc, doc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import moment from "moment";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,11 +61,14 @@ const formSchema = z.object({
     .refine((value) => /^\d+$/.test(value), {
       message: "Phone number must only contain digits.",
     }),
-  password: z.string()
+  password: z
+    .string()
     .min(8, { message: "Password must be at least 8 characters." })
     .regex(/[A-Z]/, { message: "Password must include an uppercase letter." })
     .regex(/[0-9]/, { message: "Password must include a number." })
-    .regex(/[^A-Za-z0-9]/, { message: "Password must include a special character." }),
+    .regex(/[^A-Za-z0-9]/, {
+      message: "Password must include a special character.",
+    }),
   lotId: z.string().min(1, {
     message: "Please select a lot.",
   }),
@@ -90,7 +101,10 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
       const lotsCollection = collection(db, "lots");
       const lotsQuery = query(lotsCollection, where("adminId", "==", user.id));
       const lotsSnapshot = await getDocs(lotsQuery);
-      const lotsData = lotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const lotsData = lotsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       setLots(lotsData);
       setLoading(false);
     } catch (error: any) {
@@ -114,10 +128,10 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
         where("adminId", "==", user.id)
       );
       const queuesSnapshot = await getDocs(queuesQuery);
-      const queuesData = queuesSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
+      const queuesData = queuesSnapshot.docs.map((doc) => ({
+        id: doc.id,
         ...doc.data(),
-        isDisabled: doc.data().ownerId !== ""
+        isDisabled: doc.data().ownerId !== "",
       }));
       setQueues(queuesData);
     } catch (error: any) {
@@ -128,7 +142,9 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      const selectedQueueData:any = queues.find(queue => queue.id === values.queueId);
+      const selectedQueueData: any = queues.find(
+        (queue) => queue.id === values.queueId
+      );
       if (!selectedQueueData) {
         toast.error("Selected queue not found");
         return;
@@ -140,7 +156,10 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
       }
 
       // Check if user with same email exists
-      const emailQuery = query(collection(db, "queue_owners"), where("email", "==", values.email));
+      const emailQuery = query(
+        collection(db, "queue_owners"),
+        where("email", "==", values.email)
+      );
       const emailQuerySnapshot = await getDocs(emailQuery);
       if (!emailQuerySnapshot.empty) {
         toast.error("A queue owner with this email already exists");
@@ -148,7 +167,10 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
       }
 
       // Check if user with same phone exists
-      const phoneQuery = query(collection(db, "queue_owners"), where("phone", "==", values.phone));
+      const phoneQuery = query(
+        collection(db, "queue_owners"),
+        where("phone", "==", values.phone)
+      );
       const phoneQuerySnapshot = await getDocs(phoneQuery);
       if (!phoneQuerySnapshot.empty) {
         toast.error("A queue owner with this phone number already exists");
@@ -164,7 +186,10 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
       };
 
       // Add queue owner to the queue_owners collection
-      const queueOwnerRef = await addDoc(collection(db, "queue_owners"), queueOwnerData);
+      const queueOwnerRef = await addDoc(
+        collection(db, "queue_owners"),
+        queueOwnerData
+      );
 
       // Update the queue document with the owner's ID
       const queueRef = doc(db, "queues", values.queueId);
@@ -234,32 +259,35 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
                   </FormItem>
                 )}
               />
-               <FormField
-      control={form.control}
-      name="password"
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>Password</FormLabel>
-          <FormControl>
-            <div className="relative">
-              <Input type={showPassword ? "text" : "password"} {...field} />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
-                  <AiOutlineEyeInvisible size={20} />
-                ) : (
-                  <AiOutlineEye size={20} />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <AiOutlineEyeInvisible size={20} />
+                          ) : (
+                            <AiOutlineEye size={20} />
+                          )}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </button>
-            </div>
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
+              />
             </div>
             <FormField
               control={form.control}
@@ -267,10 +295,13 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Select Lot</FormLabel>
-                  <Select onValueChange={(value) => {
-                    field.onChange(value);
-                    fetchQueues(value);
-                  }} defaultValue={field.value}>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      fetchQueues(value);
+                    }}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select Lot" />
@@ -298,7 +329,10 @@ const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Select Queue</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select Queue" />

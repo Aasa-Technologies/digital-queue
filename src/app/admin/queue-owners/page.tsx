@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { getUserData } from "@/utils";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import { Loader2 } from "lucide-react";
 
@@ -32,6 +32,9 @@ export interface QueueOwner {
 const QueueOwners = () => {
   const [queueOwners, setQueueOwners] = useState<QueueOwner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingOwnerId, setEditingOwnerId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Partial<QueueOwner>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   async function fetchQueueOwners() {
     const user = getUserData();
@@ -44,7 +47,7 @@ const QueueOwners = () => {
       const queueOwnersSnapshot = await getDocs(queueOwnersQuery);
       const queueOwnersData = queueOwnersSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       } as QueueOwner));
       setQueueOwners(queueOwnersData);
     } catch (error: any) {
@@ -54,6 +57,57 @@ const QueueOwners = () => {
       setLoading(false);
     }
   }
+
+  const handleEditClick = (owner: QueueOwner) => {
+    setEditingOwnerId(owner.id);
+    setFormData({ ...owner });
+    setErrors({});
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.name || formData.name.trim().length < 3) {
+      newErrors.name = "Name must be at least 3 characters long.";
+    }
+    if (!formData.email || !/^\S+@\S+\.\S+$/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address.";
+    }
+    if (!formData.phone || !/^\d{10}$/.test(formData.phone)) {
+      newErrors.phone = "Phone must be a 10-digit number.";
+    }
+    if (!formData.queueName || formData.queueName.trim().length === 0) {
+      newErrors.queueName = "Queue name cannot be empty.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm() || !editingOwnerId) return;
+
+    try {
+      const ownerDocRef = doc(db, "queue_owners", editingOwnerId);
+      await updateDoc(ownerDocRef, { ...formData, updatedAt: new Date() });
+      toast.success("Queue owner updated successfully!");
+      fetchQueueOwners(); // Refresh data
+      setEditingOwnerId(null); // Exit edit mode
+    } catch (error) {
+      console.error("Error updating queue owner:", error);
+      toast.error("Failed to update queue owner");
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingOwnerId(null);
+    setFormData({});
+    setErrors({});
+  };
 
   useEffect(() => {
     fetchQueueOwners();
@@ -81,15 +135,85 @@ const QueueOwners = () => {
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Queue</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {queueOwners.map((owner: QueueOwner) => (
+            {queueOwners.map((owner) => (
               <TableRow key={owner.id}>
-                <TableCell>{owner.name}</TableCell>
-                <TableCell>{owner.email}</TableCell>
-                <TableCell>{owner.phone}</TableCell>
-                <TableCell>{owner.queueName}</TableCell>
+                {editingOwnerId === owner.id ? (
+                  <>
+                    <TableCell>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name || ""}
+                        onChange={handleInputChange}
+                        className={`w-full border px-2 py-1 ${errors.name ? "border-red-500" : ""}`}
+                      />
+                      {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
+                    </TableCell>
+                    <TableCell>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email || ""}
+                        onChange={handleInputChange}
+                        className={`w-full border px-2 py-1 ${errors.email ? "border-red-500" : ""}`}
+                      />
+                      {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
+                    </TableCell>
+                    <TableCell>
+                      <input
+                        type="text"
+                        name="phone"
+                        value={formData.phone || ""}
+                        onChange={handleInputChange}
+                        className={`w-full border px-2 py-1 ${errors.phone ? "border-red-500" : ""}`}
+                      />
+                      {errors.phone && <p className="text-red-500 text-sm">{errors.phone}</p>}
+                    </TableCell>
+                    <TableCell>
+                      <input
+                        type="text"
+                        name="queueName"
+                        value={formData.queueName || ""}
+                        onChange={handleInputChange}
+                        className={`w-full border px-2 py-1 ${errors.queueName ? "border-red-500" : ""}`}
+                      />
+                      {errors.queueName && <p className="text-red-500 text-sm">{errors.queueName}</p>}
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        onClick={handleSave}
+                        className="text-green-500 hover:underline mr-2"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancel}
+                        className="text-red-500 hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell>{owner.name}</TableCell>
+                    <TableCell>{owner.email}</TableCell>
+                    <TableCell>{owner.phone}</TableCell>
+                    <TableCell>{owner.queueName}</TableCell>
+                    <TableCell>
+                      <button
+                        onClick={() => handleEditClick(owner)}
+                        className="text-black hover:underline"
+                      >
+                        Edit
+                      </button>
+                    </TableCell>
+                  </>
+                )}
               </TableRow>
             ))}
           </TableBody>

@@ -1,12 +1,20 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
- 
-// This function can be marked `async` if using `await` inside
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
 export function middleware(request: NextRequest) {
-  return NextResponse.redirect(new URL('/home', request.url))
+  // Example: Check for an auth cookie
+  const authToken = request.cookies.get('auth_token');
+
+  // If no token, redirect to login
+  if (!authToken) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // Allow the request to proceed if authenticated
+  return NextResponse.next();
 }
- 
-// See "Matching Paths" below to learn more
+
+// Specify the routes where this middleware should apply
 export const config = {
-  matcher: '/about/:path*',
-}
+  matcher: ['/', '/about/:path*'], // Add all protected paths
+};
