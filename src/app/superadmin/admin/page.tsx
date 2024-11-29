@@ -67,7 +67,14 @@ type SortConfig = {
 };
 
 const adminFormSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  name: z
+    .string()
+    .trim()
+    .min(2, { message: "Name must be at least 2 characters" })
+    .refine(
+      (value) => !/^\s/.test(value),
+      { message: "Name cannot start with a space" }
+    ),
   email: z.string().email({ message: "Invalid email address" }),
   phoneNumber: z
     .string()
@@ -76,6 +83,7 @@ const adminFormSchema = z.object({
     .number()
     .positive({ message: "Session cost must be positive" }),
 });
+
 
 export default function Admins() {
   const [admins, setAdmins] = useState<Admin[]>([]);

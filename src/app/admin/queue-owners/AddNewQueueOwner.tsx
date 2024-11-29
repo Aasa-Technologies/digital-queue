@@ -65,6 +65,7 @@ const formSchema = z.object({
     .string()
     .min(8, { message: "Password must be at least 8 characters." })
     .regex(/[A-Z]/, { message: "Password must include an uppercase letter." })
+    .regex(/[a-z]/, { message: "Password must include a lowercase letter." }) // New rule
     .regex(/[0-9]/, { message: "Password must include a number." })
     .regex(/[^A-Za-z0-9]/, {
       message: "Password must include a special character.",
@@ -76,6 +77,7 @@ const formSchema = z.object({
     message: "Please select a queue.",
   }),
 });
+
 
 const AddNewQueueOwner = ({ onOwnerAdded }: { onOwnerAdded: () => void }) => {
   const [showPassword, setShowPassword] = useState(false);

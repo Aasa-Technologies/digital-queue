@@ -26,14 +26,23 @@ import { toast } from "sonner";
 import { db } from "@/utils/firebase";
 import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
 import moment from "moment";
+import { Eye, EyeOff } from "lucide-react";
 
 const adminFormSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
   phoneNumber: z.string().regex(/^\+?[1-9]\d{9}$/, {
     message: "Phone number must be 10 digits without spaces",
   }),
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  sessionCost: z.number().positive({ message: "Session cost must be positive" }),
+  name: z
+    .string()
+    .min(2, { message: "Name must be at least 2 characters" })
+    .regex(/^[a-zA-Z0-9]+( [a-zA-Z0-9]+)*$/, {
+      message:
+        "Name can only contain alphanumeric characters and single spaces between words",
+    }),
+  sessionCost: z
+    .number()
+    .nonnegative({ message: "Session cost must be zero or positive" }),
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
@@ -55,6 +64,7 @@ export default function AddNewAdmin({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<AdminFormValues>({
     resolver: zodResolver(adminFormSchema),
@@ -62,7 +72,7 @@ export default function AddNewAdmin({
       email: "",
       phoneNumber: "",
       name: "",
-      sessionCost: 0,
+      sessionCost: undefined, // Ensure no prefilled value
       password: "",
     },
   });
@@ -179,11 +189,14 @@ export default function AddNewAdmin({
                         <Input
                           type="number"
                           step="0.01"
-                          min="0.01"
-                          {...field}
+                          placeholder="Enter session cost"
+                          value={field.value !== undefined ? field.value : ""}
                           onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            field.onChange(value > 0 ? value : "");
+                            const value =
+                              e.target.value === ""
+                                ? undefined
+                                : parseFloat(e.target.value);
+                            field.onChange(value);
                           }}
                         />
                       </FormControl>
@@ -191,6 +204,7 @@ export default function AddNewAdmin({
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="password"
@@ -198,11 +212,24 @@ export default function AddNewAdmin({
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Enter password"
-                          {...field}
-                        />
+                        <div className="relative">
+                          <Input
+                            type={showPassword ? "text" : "password"} // Toggle type
+                            placeholder="Enter password"
+                            {...field}
+                          />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-3 flex items-center"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-5 w-5 text-gray-500" />
+                            ) : (
+                              <Eye className="h-5 w-5 text-gray-500" />
+                            )}
+                          </button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
